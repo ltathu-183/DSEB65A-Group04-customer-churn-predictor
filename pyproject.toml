@@ -1,0 +1,19 @@
+[project]
+name = "dseb65a-group04-customer-churn-predictor"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.135.3",
+    "joblib>=1.5.3",
+    "mlflow>=3.10.1",
+    "pandas>=2.3.3",
+    "pydantic>=2.12.5",
+    "requests>=2.33.1",
+    "ruff>=0.15.9",
+    "scikit-learn>=1.8.0",
+    "scipy>=1.17.1",
+    "streamlit>=1.56.0",
+    "uvicorn>=0.44.0",
+]

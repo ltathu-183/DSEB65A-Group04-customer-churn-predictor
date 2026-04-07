@@ -1,0 +1,35 @@
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Jupyter artifacts
+.ipynb_checkpoints/
+
+# ML model files (Giữ lại pipeline nếu cần, nhưng chặn model nặng)
+*.pkl
+*.pt
+*.pth
+*.h5
+
+# Experiment tracking
+mlruns/
+mlflow.db
+
+# Data 
+data/raw/*.csv
+data/processed/*.csv
+data/preprocessed/*.csv
+data/preprocessed/*.parquet
+
+# OS-specific & IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
