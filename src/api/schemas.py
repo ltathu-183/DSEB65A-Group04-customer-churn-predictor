@@ -39,4 +39,3 @@ class ChurnPredictionResponse(BaseModel):
     churn_probability: float | None = Field(
         None,
         description="Probability of the churn class if the model supports predict_proba",
-    )

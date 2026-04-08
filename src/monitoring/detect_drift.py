@@ -137,6 +137,7 @@ if __name__ == "__main__":
     TRAIN_FILE = BASE_DIR / "data" / "raw" / "train.csv"
     TEST_FILE = BASE_DIR / "data" / "raw" / "new_dataset.csv"
 
+
     # Initialize detector with enterprise thresholds
     detector = DriftDetector(p_val_threshold=0.05, psi_threshold=0.20)
     drifted_list = detector.run(TRAIN_FILE, TEST_FILE)
@@ -149,4 +150,5 @@ if __name__ == "__main__":
         sys.exit(0) 
     else:
         logger.info("RESULT: No significant drift detected. Data is stable.")
-        sys.exit(0)
+      sys.exit(0)
+
