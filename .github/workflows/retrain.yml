@@ -1,0 +1,32 @@
+name: Retrain
+
+on:
+  workflow_dispatch:
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - run: pip install uv
+      - run: uv pip install -r requirements.txt --system
+
+      - name: Retrain
+        run: |
+          python src/models/train.py \
+            --data data/raw/train.csv \
+            --model_dir models
+
+      - name: Commit model
+        run: |
+          git config --global user.name "mlops-bot"
+          git config --global user.email "bot@github.com"
+          git add models/
+          git commit -m "auto retrain"
+          git push
