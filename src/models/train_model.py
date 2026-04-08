@@ -10,7 +10,7 @@ from sklearn.metrics import f1_score, accuracy_score
 from sklearn.pipeline import Pipeline
 from sklearn.ensemble import RandomForestClassifier
 
-from src.features.engineer import create_features, create_preprocessor
+from src.features.engineer import create_features, create_preprocessor, FeatureEngineer
 
 
 def main(args):
@@ -18,7 +18,7 @@ def main(args):
     df = pd.read_csv(args.data)
 
     # Feature engineering
-    df = create_features(df)
+    # df = create_features(df)
 
     target = "Churn"
 
@@ -32,9 +32,10 @@ def main(args):
 
     # Pipeline
     pipeline = Pipeline([
-        ("preprocessor", create_preprocessor()),
-        ("model", RandomForestClassifier(random_state=42))
-    ])
+    ("feature_engineering", FeatureEngineer()),
+    ("preprocessor", create_preprocessor()),
+    ("model", RandomForestClassifier(random_state=42))
+])
 
     # Hyperparameter space
     param_dist = {
@@ -78,7 +79,7 @@ def main(args):
         mlflow.sklearn.log_model(best_model, "model")
 
         # Save model
-        model_path = f"{args.model_dir}/churn_model.pkl"
+        model_path = f"{args.model_dir}/model.pkl"
         joblib.dump(best_model, model_path)
 
         # Save config YAML

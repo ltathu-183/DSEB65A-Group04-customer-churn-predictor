@@ -1,6 +1,8 @@
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.base import BaseEstimator, TransformerMixin
+
 
 # -----------------------------
 # Feature Engineering
@@ -34,6 +36,21 @@ def create_features(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     return df
+
+
+class FeatureEngineer(BaseEstimator, TransformerMixin):
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        X = X.copy()
+
+        X["Age Group"] = X["Age"].apply(classify_age_group)
+        X["Interaction Frequency"] = X["Last Interaction"].apply(
+            classify_interaction_frequency
+        )
+
+        return X
 
 
 # -----------------------------
