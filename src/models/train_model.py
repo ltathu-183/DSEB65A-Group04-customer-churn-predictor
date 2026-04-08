@@ -6,11 +6,11 @@ import mlflow
 import mlflow.sklearn
 
 from sklearn.model_selection import train_test_split, RandomizedSearchCV
-from sklearn.metrics import f1_score, accuracy_score, f1_score, accuracy_score, precision_score, recall_score
+from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score
 from sklearn.pipeline import Pipeline
 from sklearn.ensemble import RandomForestClassifier
 
-from src.features.engineer import create_features, create_preprocessor, FeatureEngineer
+from src.features.engineer import create_preprocessor, FeatureEngineer
 
 
 def main(args):
