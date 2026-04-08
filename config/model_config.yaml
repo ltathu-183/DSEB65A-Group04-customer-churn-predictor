@@ -2,7 +2,7 @@ model:
   best_model: RandomForestClassifier
   name: churn_model
   parameters:
-    model__max_depth: null
+    model__max_depth: 15
     model__min_samples_split: 5
-    model__n_estimators: 300
+    model__n_estimators: 200
   target_variable: Churn

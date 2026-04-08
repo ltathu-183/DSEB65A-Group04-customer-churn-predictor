@@ -6,7 +6,7 @@ import mlflow
 import mlflow.sklearn
 
 from sklearn.model_selection import train_test_split, RandomizedSearchCV
-from sklearn.metrics import f1_score, accuracy_score
+from sklearn.metrics import f1_score, accuracy_score, f1_score, accuracy_score, precision_score, recall_score
 from sklearn.pipeline import Pipeline
 from sklearn.ensemble import RandomForestClassifier
 
@@ -14,45 +14,42 @@ from src.features.engineer import create_features, create_preprocessor, FeatureE
 
 
 def main(args):
-    # Load data
-    df = pd.read_csv(args.data)
+   # Load data
+   df = pd.read_csv(args.data)
 
-    # Feature engineering
-    # df = create_features(df)
+   target = "Churn"
 
-    target = "Churn"
+   X = df.drop(columns=[target])
+   y = df[target]
 
-    X = df.drop(columns=[target])
-    y = df[target]
-
-    # Split
-    X_train, X_test, y_train, y_test = train_test_split(
+   # Split
+   X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, stratify=y
     )
 
-    # Pipeline
-    pipeline = Pipeline([
-    ("feature_engineering", FeatureEngineer()),
-    ("preprocessor", create_preprocessor()),
-    ("model", RandomForestClassifier(random_state=42))
+   # Pipeline
+   pipeline = Pipeline([
+   ("feature_engineering", FeatureEngineer()),
+   ("preprocessor", create_preprocessor()),
+   ("model", RandomForestClassifier(random_state=42))
 ])
 
-    # Hyperparameter space
-    param_dist = {
+   # Hyperparameter space
+   param_dist = {
         "model__n_estimators": [100, 200, 300],
         "model__max_depth": [5, 10, 15, None],
         "model__min_samples_split": [2, 5, 10]
     }
 
-    # MLflow
-    mlflow.set_experiment("churn_model")
+   # MLflow
+   mlflow.set_experiment("churn_model")
 
-    with mlflow.start_run():
+   with mlflow.start_run():
 
         search = RandomizedSearchCV(
             pipeline,
             param_distributions=param_dist,
-            n_iter=5,
+            n_iter=10,
             scoring="f1",
             cv=3,
             n_jobs=-1,
@@ -66,15 +63,23 @@ def main(args):
         # Predict
         y_pred = best_model.predict(X_test)
 
-        f1 = f1_score(y_test, y_pred)
         acc = accuracy_score(y_test, y_pred)
+        precision = precision_score(y_test, y_pred) 
+        recall = recall_score(y_test, y_pred)
+        f1 = f1_score(y_test, y_pred)  # default = binary
+        f1_macro = f1_score(y_test, y_pred, average="macro")
+        f1_weighted = f1_score(y_test, y_pred, average="weighted")
 
         # Log MLflow
         mlflow.log_params(search.best_params_)
         mlflow.log_metrics({
-            "f1": f1,
-            "accuracy": acc
-        })
+         "accuracy": acc,
+         "precision": precision,
+         "recall": recall,
+         "f1": f1,
+         "f1_macro": f1_macro,
+         "f1_weighted": f1_weighted
+      })
 
         mlflow.sklearn.log_model(best_model, "model")
 
@@ -96,17 +101,21 @@ def main(args):
             yaml.dump(config, f)
 
         print("Training complete")
-        print(f"F1: {f1:.4f}, Accuracy: {acc:.4f}")
-        print(f"Model saved to {model_path}")
+        print(f"Accuracy: {acc:.4f}")
+        print(f"Precision: {precision:.4f}")
+        print(f"Recall: {recall:.4f}")
+        print(f"F1 (binary): {f1:.4f}")
+        print(f"F1 (macro): {f1_macro:.4f}")
+        print(f"F1 (weighted): {f1_weighted:.4f}")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+   parser = argparse.ArgumentParser()
 
-    parser.add_argument("--data", required=True)
-    parser.add_argument("--model_dir", required=True)
-    parser.add_argument("--config_out", required=True)
+   parser.add_argument("--data", required=True)
+   parser.add_argument("--model_dir", required=True)
+   parser.add_argument("--config_out", required=True)
 
-    args = parser.parse_args()
+   args = parser.parse_args()
 
-    main(args)
+   main(args)
