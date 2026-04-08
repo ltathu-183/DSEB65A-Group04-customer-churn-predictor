@@ -1,15 +1,21 @@
-name: MLOps CI
-on: [pull_request]
+name: CI
+
+on: [push, pull_request]
+
 jobs:
-  lint:
+  lint-and-test:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with: {python-version: '3.11'}
-      - name: Install uv and lint
-        run: |
-          pip install uv
-          uv pip install ruff --system
-          ruff check src/
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - run: pip install uv
+      - run: uv pip install -r requirements.txt pytest --system
+
+
+      - run: ruff check src/
+
