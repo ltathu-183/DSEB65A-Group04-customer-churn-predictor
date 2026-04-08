@@ -27,16 +27,6 @@ _RAW_COLUMN_MAP: list[tuple[str, str]] = [
     ("last_interaction", "Last Interaction"),
 ]
 
-def feature_engineer(raw_df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Apply the same feature engineering as training (`src/features/engineer.py`).
-
-    In `src/models/train_model.py`, `create_features(df)` is executed BEFORE fitting the
-    sklearn Pipeline, so we must do the same at inference time.
-    """
-    return create_features(raw_df)
-
-
 def _default_model_path() -> Path:
     root = Path(__file__).resolve().parents[2]
     env_path = os.getenv("MODEL_PATH")
@@ -75,7 +65,7 @@ def customer_to_dataframe(customer: CustomerFeatures) -> pd.DataFrame:
 def predict_churn(customer: CustomerFeatures) -> ChurnPredictionResponse:
     """Trả về dự đoán churn từ model local (ưu tiên .joblib)."""
     model = load_model()
-    X = feature_engineer(customer_to_dataframe(customer))
+    X = customer_to_dataframe(customer)
 
     pred = model.predict(X)
     churn_bool = bool(pred[0])
