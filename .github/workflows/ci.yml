@@ -1,15 +1,36 @@
-name: MLOps CI
-on: [pull_request]
+name: MLOps CI Pipeline
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
 jobs:
-  lint:
+  lint-and-check:
     runs-on: ubuntu-latest
+    
     steps:
-      - uses: actions/checkout@v4
+      # 1. Tải code từ repository về máy ảo của GitHub
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      # 2. Cài đặt Python 3.11
       - name: Set up Python
         uses: actions/setup-python@v5
-        with: {python-version: '3.11'}
-      - name: Install uv and lint
+        with:
+          python-version: '3.11'
+          
+      # 3. Cài đặt công cụ uv 
+      - name: Install uv
+        run: pip install uv
+        
+      # 4. Cài đặt ruff để kiểm tra lỗi code
+      - name: Install Ruff
+        run: uv pip install ruff --system
+          
+      # 5. Chạy lệnh Ruff Check (Nhiệm vụ Team Lead yêu cầu)
+      - name: Run Ruff Linter
         run: |
-          pip install uv
-          uv pip install ruff --system
+          # Kiểm tra toàn bộ thư mục src/ xem có ai viết code lỗi không
           ruff check src/
