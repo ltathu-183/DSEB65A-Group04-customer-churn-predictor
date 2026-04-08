@@ -1,4 +1,4 @@
-name: MLOps CI Pipeline
+name: MLOps End-to-End CI
 
 on:
   pull_request:
@@ -7,30 +7,44 @@ on:
     branches: [ main ]
 
 jobs:
-  lint-and-check:
+  quality-assurance:
     runs-on: ubuntu-latest
-    
     steps:
-      # 1. Tải code từ repository về máy ảo của GitHub
       - name: Checkout code
         uses: actions/checkout@v4
         
-      # 2. Cài đặt Python 3.11
-      - name: Set up Python
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           
-      # 3. Cài đặt công cụ uv 
       - name: Install uv
         run: pip install uv
         
-      # 4. Cài đặt ruff để kiểm tra lỗi code
-      - name: Install Ruff
-        run: uv pip install ruff --system
-          
-      # 5. Chạy lệnh Ruff Check (Nhiệm vụ Team Lead yêu cầu)
-      - name: Run Ruff Linter
+      - name: Install dependencies
         run: |
-          # Kiểm tra toàn bộ thư mục src/ xem có ai viết code lỗi không
-          ruff check src/
+          uv pip install --system -r requirements.txt pytest ruff
+          
+      - name: 1. Data Integrity Check
+        run: |
+          echo "Checking datasets..."
+          test -f data/raw/train.csv && echo "✅ train.csv exists"
+          test -f data/raw/new_dataset.csv && echo "✅ new_dataset.csv exists"
+
+      - name: 2. Code Linting (Ruff)
+        run: |
+          ruff check src/ streamlit_app/
+          
+      - name: 3. Structural Sanity Check
+        run: |
+          echo "Checking essential MLOps files..."
+          test -f src/api/main.py || (echo "❌ Backend main.py missing" && exit 1)
+          test -f src/models/train_model.py || (echo "❌ Train script missing" && exit 1)
+          test -f streamlit_app/app.py || (echo "❌ Streamlit app missing" && exit 1)
+
+      - name: 4. Dry-run Docker Build
+        run: |
+          echo "Testing Docker image builds (Dry-run)..."
+          # Bước này kiểm tra xem Dockerfile của Role 5 có bị lỗi không
+          docker build -t fastapi-test -f Dockerfile .
+          docker build -t streamlit-test -f streamlit_app/Dockerfile ./streamlit_app
