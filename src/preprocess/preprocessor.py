@@ -1,6 +1,5 @@
 import pandas as pd
 import logging
-import pandas as pd
 import argparse
 from pathlib import Path
 
