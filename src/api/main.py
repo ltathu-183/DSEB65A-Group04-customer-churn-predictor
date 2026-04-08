@@ -1,5 +1,7 @@
 """FastAPI: /health và /predict — chỉ đọc model local (.joblib/.pkl)."""
-
+## uv run uvicorn src.api.main:app --reload 
+# chạy lệnh trên để lấy API_URL
+# API_URL = http://127.0.0.1:8000
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
