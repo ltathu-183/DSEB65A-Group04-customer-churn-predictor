@@ -150,5 +150,5 @@ if __name__ == "__main__":
         sys.exit(0) 
     else:
         logger.info("RESULT: No significant drift detected. Data is stable.")
-      sys.exit(0)
+    sys.exit(0)
 
