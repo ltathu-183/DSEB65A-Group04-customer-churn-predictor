@@ -11,7 +11,6 @@ import joblib
 import pandas as pd
 
 from src.api.schemas import ChurnPredictionResponse, CustomerFeatures
-from src.features.engineer import create_features
 
 # Cột raw giống train.csv sau khi bỏ CustomerID và Churn (thứ tự ổn định cho DataFrame)
 _RAW_COLUMN_MAP: list[tuple[str, str]] = [

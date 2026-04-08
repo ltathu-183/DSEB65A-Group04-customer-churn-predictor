@@ -1,12 +1,5 @@
 import pandas as pd
 import logging
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
-from sklearn.impute import SimpleImputer
-import joblib
-
-import pandas as pd
 import argparse
 from pathlib import Path
 
