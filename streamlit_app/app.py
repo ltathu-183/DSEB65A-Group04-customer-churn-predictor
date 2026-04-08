@@ -7,8 +7,8 @@ st.set_page_config(page_title="Customer Churn Prediction - Group 4", layout="wid
 
 st.title("📊 Customer Churn Prediction System")
 st.markdown("""
-Ứng dụng này sử dụng mô hình Machine Learning để dự đoán khả năng một khách hàng sẽ ngừng sử dụng dịch vụ. 
-*Kết quả dựa trên dữ liệu hành vi và thông tin cá nhân của khách hàng.*
+This application leverages a **Machine Learning model** to predict the probability of customer attrition (churn). 
+*Predictions are generated based on real-time behavioral metrics and demographic data.*
 """)
 
 # 2. Cấu hình Endpoint API (Tư duy MLOps: Dùng biến môi trường để sau này chạy Docker)
