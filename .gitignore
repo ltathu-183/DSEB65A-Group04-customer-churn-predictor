@@ -13,7 +13,7 @@ __pycache__/
 .ipynb_checkpoints/
 
 # ML model files (Giữ lại pipeline nếu cần, nhưng chặn model nặng)
-*.pkl
+
 *.pt
 *.pth
 *.h5

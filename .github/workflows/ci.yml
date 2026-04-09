@@ -1,15 +1,50 @@
-name: MLOps CI
-on: [pull_request]
+name: MLOps End-to-End CI
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
 jobs:
-  lint:
+  quality-assurance:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
-        with: {python-version: '3.11'}
-      - name: Install uv and lint
+        with:
+          python-version: '3.11'
+          
+      - name: Install uv
+        run: pip install uv
+        
+      - name: Install dependencies
         run: |
-          pip install uv
-          uv pip install ruff --system
-          ruff check src/
+          uv pip install --system -r requirements.txt pytest ruff
+          
+      - name: 1. Data Integrity Check
+        run: |
+          echo "Checking datasets..."
+          test -f data/raw/train.csv && echo "✅ train.csv exists"
+          test -f data/raw/new_dataset.csv && echo "✅ new_dataset.csv exists"
+
+      - name: 2. Code Linting (Ruff)
+        run: |
+          ruff check src/ streamlit_app/
+          
+      - name: 3. Structural Sanity Check
+        run: |
+          echo "Checking essential MLOps files..."
+          test -f src/api/main.py || (echo "❌ Backend main.py missing" && exit 1)
+          test -f src/models/train_model.py || (echo "❌ Train script missing" && exit 1)
+          test -f streamlit_app/app.py || (echo "❌ Streamlit app missing" && exit 1)
+
+      - name: 4. Dry-run Docker Build
+        run: |
+          echo "Testing Docker image builds (Dry-run)..."
+          # Bước này kiểm tra xem Dockerfile của Role 5 có bị lỗi không
+          docker build -t fastapi-test -f Dockerfile .
+          docker build -t streamlit-test -f streamlit_app/Dockerfile ./streamlit_app

@@ -1,0 +1,30 @@
+name: Drift Monitoring
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - run: pip install uv
+      - run: uv pip install -r requirements.txt --system
+
+      - name: Run Drift Detection
+        env:
+          GITHUB_TOKEN: ${{ secrets.TOKENFORMLOPS }} 
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          python src/monitoring/detect_drift.py \
+            --ref data/raw/train.csv \
+            --curr data/raw/test.csv \
+            --model_dir models

@@ -4,36 +4,41 @@ from pydantic import BaseModel, Field
 
 
 class CustomerFeatures(BaseModel):
-    """Một dòng khách hàng (không gồm CustomerID / Churn), đúng kiểu dữ liệu huấn luyện."""
 
-    age: int = Field(..., ge=0, le=120, description="Tuổi")
-    gender: str = Field(..., description="Giới tính, ví dụ: Male, Female")
-    tenure: int = Field(..., ge=0, description="Thời gian gắn bó (tháng)")
-    usage_frequency: int = Field(..., ge=0, description="Tần suất sử dụng")
-    support_calls: int = Field(..., ge=0, description="Số cuộc gọi hỗ trợ")
-    payment_delay: int = Field(..., ge=0, description="Độ trễ thanh toán (ngày)")
+    """One customer record (no CustomerID / Churn), matching training data types."""
+
+    age: int = Field(..., ge=0, le=120, description="Customer age")
+    gender: str = Field(..., description="Gender, e.g. Male, Female")
+    tenure: int = Field(..., ge=0, description="Tenure in months")
+    usage_frequency: int = Field(..., ge=0, description="Usage frequency")
+    support_calls: int = Field(..., ge=0, description="Number of support calls")
+    payment_delay: int = Field(..., ge=0, description="Payment delay in days")
     subscription_type: str = Field(
         ...,
-        description="Gói dịch vụ, ví dụ: Basic, Standard, Premium",
+        description="Subscription tier, e.g. Basic, Standard, Premium",
     )
     contract_length: str = Field(
         ...,
-        description="Loại hợp đồng, ví dụ: Monthly, Quarterly, Annual",
+        description="Contract type, e.g. Monthly, Quarterly, Annual",
     )
-    total_spend: float = Field(..., ge=0, description="Tổng chi tiêu")
+    total_spend: float = Field(..., ge=0, description="Total spend")
     last_interaction: int = Field(
         ...,
         ge=0,
-        description="Ngày kể từ lần tương tác cuối (Last Interaction)",
+        description="Days since last interaction (Last Interaction)",
     )
 
 
 class ChurnPredictionResponse(BaseModel):
-    """Kết quả dự đoán churn."""
 
-    churn: bool = Field(..., description="True nếu mô hình dự đoán churn (lớp dương)")
-    label: str = Field(..., description="Nhãn đọc được: Churn hoặc No Churn")
+    """Churn prediction result."""
+
+    churn: bool = Field(
+        ...,
+        description="True if the model predicts churn (positive class)",
+    )
+    label: str = Field(..., description="Human-readable label: Churn or No Churn")
     churn_probability: float | None = Field(
         None,
-        description="Xác suất lớp churn nếu mô hình có predict_proba",
+        description="Probability of the churn class if the model supports predict_proba",
     )
