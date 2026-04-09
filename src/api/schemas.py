@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 
 class CustomerFeatures(BaseModel):
+
     """One customer record (no CustomerID / Churn), matching training data types."""
 
     age: int = Field(..., ge=0, le=120, description="Customer age")
@@ -29,6 +30,7 @@ class CustomerFeatures(BaseModel):
 
 
 class ChurnPredictionResponse(BaseModel):
+
     """Churn prediction result."""
 
     churn: bool = Field(
