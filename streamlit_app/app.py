@@ -11,9 +11,11 @@ This application leverages a **Machine Learning model** to predict the probabili
 *Predictions are generated based on real-time behavioral metrics and demographic data.*
 """)
 
-# 2. Cấu hình Endpoint API (Dùng biến môi trường để chạy Docker - Phase 3)
-BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000/predict")
-
+# 2. Cấu hình Endpoint API 
+_api_base = os.getenv("API_URL") or os.getenv("BACKEND_URL") or "http://localhost:8000"
+BACKEND_URL = _api_base.rstrip("/")
+if not BACKEND_URL.endswith("/predict"):
+    BACKEND_URL = f"{BACKEND_URL}/predict"
 # 3. Giao diện nhập liệu
 st.subheader("📝 Customer Information Input")
 
