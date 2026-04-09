@@ -1,9 +1,16 @@
 services:
   fastapi:
     build: .
-    ports: ["8000:8000"]
+    ports:
+      - "8000:8000"
+    restart: always
+
   streamlit:
     build: ./streamlit_app
-    ports: ["8501:8501"]
+    ports:
+      - "8501:8501"
     environment:
-      - API_URL=http://fastapi:8000
+      - API_URL=http://fastapi:8000/predict
+    restart: always
+    depends_on:
+      - fastapi
