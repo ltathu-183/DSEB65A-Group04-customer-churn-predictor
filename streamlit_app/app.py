@@ -18,8 +18,8 @@ _api_base = os.getenv("API_URL") or os.getenv("BACKEND_URL") or "http://localhos
 BACKEND_URL = _api_base.rstrip("/")
 if not BACKEND_URL.endswith("/predict"):
     BACKEND_URL = f"{BACKEND_URL}/predict"
-
-# 3. Giao diện nhập liệu (Dựa chính xác 100% vào schemas.py của Ly)
+    
+# 3. Giao diện nhập liệu
 st.subheader("📝 Customer Information Input")
 
 with st.form("churn_form"):
@@ -43,7 +43,6 @@ with st.form("churn_form"):
 
 # 4. Xử lý Logic khi nhấn nút
 if submit_button:
-    # Chuẩn bị dữ liệu JSON đúng cấu trúc CustomerFeatures của Ly
     input_data = {
         "age": int(age),
         "gender": str(gender),
@@ -59,7 +58,6 @@ if submit_button:
 
     try:
         with st.spinner("Connecting to prediction server..."):
-            # Gửi POST request tới API của Ly
             response = requests.post(BACKEND_URL, json=input_data, timeout=10)
             
         if response.status_code == 200:
@@ -71,7 +69,6 @@ if submit_button:
             st.divider()
             st.subheader("🎯 Prediction Results:")
             
-            # Hiển thị trực quan theo kết quả (Ghi điểm UX)
             if churn_status:
                 st.error(f"🔴 CUSTOMER STATUS: {label.upper()}")
             else:
@@ -80,10 +77,8 @@ if submit_button:
             if prob is not None:
                 st.info(f"Churn Probability: **{prob*100:.2f}%**")
                 st.progress(prob)
-                
         else:
             st.error(f"❌ API Server Error (Status Code: {response.status_code})")
-            st.write(response.text)
 
     except requests.exceptions.ConnectionError:
         st.error("❌ Connection Error. Please ensure FastAPI is running at " + BACKEND_URL)
