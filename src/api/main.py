@@ -1,6 +1,6 @@
-"""FastAPI: /health và /predict — chỉ đọc model local (.joblib/.pkl)."""
+"""FastAPI: /health and /predict — local model access only (.joblib/.pkl)."""
 ## uv run uvicorn src.api.main:app --reload 
-# chạy lệnh trên để lấy API_URL
+# Run the command above to get the API_URL
 # API_URL = http://127.0.0.1:8000
 from contextlib import asynccontextmanager
 
@@ -12,11 +12,11 @@ from src.api.schemas import ChurnPredictionResponse, CustomerFeatures
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Warm-up: kiểm tra load được model khi khởi động (fail fast)."""
+    """Warm-up: Verify model loading on startup (fail fast)."""
     try:
         load_model()
     except FileNotFoundError as e:
-        # Vẫn chạy app để /health báo trạng thái; /predict sẽ lỗi rõ ràng
+        # App continues to run so /health can report status; /predict will raise clear errors
         app.state.model_load_error = str(e)
     else:
         app.state.model_load_error = None
@@ -26,14 +26,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Churn Prediction API",
-    description="Dự đoán churn từ model local (ưu tiên .joblib, fallback .pkl), không Feast / Redis.",
+    description="Churn prediction using local models (prefers .joblib, falls back to .pkl), no Feast / Redis.",
     lifespan=lifespan,
 )
 
 
 @app.get("/health")
 def health():
-    """Kiểm tra API và (nếu có) model đã load được."""
+    """Check API status and verify if the model is loaded."""
     err = getattr(app.state, "model_load_error", None)
     if err:
         return {"status": "degraded", "model": "missing_or_unreadable", "detail": err}
@@ -47,9 +47,9 @@ def health():
 @app.post("/predict", response_model=ChurnPredictionResponse)
 def predict(customer: CustomerFeatures):
     """
-    Nhận đặc trưng khách hàng (JSON) và trả về dự đoán Churn.
+    Receive customer features (JSON) and return Churn prediction.
 
-    Body dùng tên field snake_case; bên trong được map sang tên cột CSV.
+    The request body uses snake_case fields, which are mapped internally to CSV column names.
     """
     try:
         return predict_churn(customer)
@@ -58,5 +58,5 @@ def predict(customer: CustomerFeatures):
     except Exception as e:
         raise HTTPException(
             status_code=400,
-            detail=f"Lỗi khi dự đoán (kiểm tra model local .joblib/.pkl và định dạng dữ liệu): {e}",
+            detail=f"Prediction error (check local .joblib/.pkl model and data format): {e}",
         ) from e

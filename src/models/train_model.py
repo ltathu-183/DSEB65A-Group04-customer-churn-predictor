@@ -6,7 +6,7 @@ root_dir = Path(__file__).resolve().parents[2]
 if str(root_dir) not in sys.path:
     sys.path.insert(0, str(root_dir))
 
-# Thêm # noqa: E402 vào từng dòng import dưới đây
+# Add # noqa: E402 into each import below to ignore "module level import not at top of file" since we need to fix sys.path first
 import argparse # noqa: E402
 import json # noqa: E402
 import shutil # noqa: E402

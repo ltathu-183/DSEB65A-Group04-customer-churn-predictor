@@ -12,7 +12,7 @@ import pandas as pd
 
 from src.api.schemas import ChurnPredictionResponse, CustomerFeatures
 
-# Cột raw giống train.csv sau khi bỏ CustomerID và Churn (thứ tự ổn định cho DataFrame)
+# Raw columns matching train.csv after dropping CustomerID and Churn (stable order for DataFrame)
 _RAW_COLUMN_MAP: list[tuple[str, str]] = [
     ("age", "Age"),
     ("gender", "Gender"),
@@ -41,19 +41,19 @@ def _default_model_path() -> Path:
 @lru_cache(maxsize=1)
 def load_model() -> Any:
     """
-    Đọc model cục bộ một lần (cache) bằng joblib.
+    Load the local model once (cached) using joblib.
 
-    Khuyến nghị: model là sklearn Pipeline đã fit end-to-end
-    (tiền xử lý + mô hình) để gọi .predict() trực tiếp trên bảng raw ở trên.
+    Recommendation: The model should be a fitted end-to-end sklearn Pipeline 
+    (preprocessing + model) to call .predict() directly on the raw data table defined above.
     """
     path = _default_model_path()
     if not path.is_file():
-        raise FileNotFoundError(f"Không tìm thấy model: {path}")
+        raise FileNotFoundError(f"Model file not found: {path}")
     return joblib.load(path)
 
 
 def customer_to_dataframe(customer: CustomerFeatures) -> pd.DataFrame:
-    """Chuyển body JSON sang một dòng DataFrame đúng tên cột huấn luyện."""
+    """Convert JSON body to a single-row DataFrame with correct training column names."""
     row = {
         csv_name: getattr(customer, py_name)
         for py_name, csv_name in _RAW_COLUMN_MAP
@@ -62,7 +62,7 @@ def customer_to_dataframe(customer: CustomerFeatures) -> pd.DataFrame:
 
 
 def predict_churn(customer: CustomerFeatures) -> ChurnPredictionResponse:
-    """Trả về dự đoán churn từ model local (ưu tiên .joblib)."""
+    """Return churn prediction from the local model (prefers .joblib)."""
     model = load_model()
     X = customer_to_dataframe(customer)
 
@@ -72,7 +72,7 @@ def predict_churn(customer: CustomerFeatures) -> ChurnPredictionResponse:
     proba: float | None = None
     if hasattr(model, "predict_proba"):
         probs = model.predict_proba(X)[0]
-        # Giả định lớp dương (churn) là cột 1 — đúng với binary {0,1} và LabelEncoder thông thường
+        # Assume positive class (churn) is at index 1 — standard for binary {0,1} and LabelEncoder
         if len(probs) >= 2:
             proba = float(probs[1])
         else:
@@ -86,5 +86,5 @@ def predict_churn(customer: CustomerFeatures) -> ChurnPredictionResponse:
 
 
 def clear_model_cache() -> None:
-    """Tiện ích cho test / reload model."""
+    """Utility for testing or reloading the model."""
     load_model.cache_clear()
