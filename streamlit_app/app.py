@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 import os
 
-# 1. Cấu hình trang và tiêu đề (Ghi điểm UX/UI)
+# 1. Page Configuration & Header (UX/UI Bonus)
 st.set_page_config(page_title="Customer Churn Prediction - Group 4", layout="wide")
 
 st.title("📊 Customer Churn Prediction System")
@@ -11,15 +11,16 @@ This application leverages a **Machine Learning model** to predict the probabili
 *Predictions are generated based on real-time behavioral metrics and demographic data.*
 """)
 
-# 2. API endpoint config:
+# 2. API Endpoint Configuration:
 # - Docker compose typically sets API_URL=http://fastapi:8000
 # - Local run can set BACKEND_URL=http://localhost:8000/predict
+# This logic ensures compatibility across different environments (local vs containerized)
 _api_base = os.getenv("API_URL") or os.getenv("BACKEND_URL") or "http://localhost:8000"
 BACKEND_URL = _api_base.rstrip("/")
 if not BACKEND_URL.endswith("/predict"):
     BACKEND_URL = f"{BACKEND_URL}/predict"
     
-# 3. Giao diện nhập liệu
+# 3. User Input Interface
 st.subheader("📝 Customer Information Input")
 
 with st.form("churn_form"):
@@ -41,8 +42,9 @@ with st.form("churn_form"):
 
     submit_button = st.form_submit_button("🚀 Run Prediction")
 
-# 4. Xử lý Logic khi nhấn nút
+# 4. Prediction Logic Processing
 if submit_button:
+    # Prepare JSON payload matching the backend CustomerFeatures schema
     input_data = {
         "age": int(age),
         "gender": str(gender),
@@ -69,6 +71,7 @@ if submit_button:
             st.divider()
             st.subheader("🎯 Prediction Results:")
             
+            # Visual feedback based on result (UX Improvement)
             if churn_status:
                 st.error(f"🔴 CUSTOMER STATUS: {label.upper()}")
             else:
@@ -85,6 +88,6 @@ if submit_button:
     except Exception as e:
         st.error(f"⚠️ An unknown error occurred: {str(e)}")
 
-# 5. Thông tin nhóm (Footer)
+# 5. Team Information (Footer)
 st.sidebar.markdown("---")
 st.sidebar.info("📌 **Group 4 - MLOps Project**")
