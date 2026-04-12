@@ -13,7 +13,7 @@ import shutil # noqa: E402
 from datetime import datetime # noqa: E402
 
 import joblib # noqa: E402
-import mlflow #git pull origin main noqa: E402
+import mlflow # noqa: E402
 import mlflow.sklearn # noqa: E402
 import pandas as pd # noqa: E402
 import yaml # noqa: E402
