@@ -17,23 +17,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout repository (Pinned to v4 as per best practices)
+      # 1. Checkout repository with full history
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 2. Set up Python environment
+      # 2. Set up Python 3.11 environment for the runner
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # 3. Install uv package manager and core dependencies
+      # 3. Install uv package manager and core CI tools
       - name: Install uv and CI Tools
         run: |
           pip install uv
           uv pip install --system ruff dvc dvc-s3
 
-      # 4. Fail-Fast: Run Code Linting before heavy operations
+      # 4. Fail-Fast: Run Code Linting (Ruff) before heavy operations
       - name: Run Code Linting (Ruff)
         run: |
           echo "Running Ruff to enforce code quality..."
@@ -45,7 +45,7 @@ jobs:
           DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
         run: |
           echo "Authenticating with DagsHub remote..."
-          # Configure DVC to use DagsHub token securely (Basic Auth method)
+          # Configure DVC to use DagsHub token securely via local config
           dvc remote modify origin --local auth basic
           dvc remote modify origin --local user __token__
           dvc remote modify origin --local password $DAGSHUB_TOKEN
@@ -57,7 +57,6 @@ jobs:
       - name: Verify Data & Model Existence
         run: |
           echo "Checking essential artifacts for reproducibility..."
-          
           MISSING_FILES=0
           
           if [ ! -f "models/model.pkl" ]; then
@@ -74,8 +73,7 @@ jobs:
             echo "Sanity check failed. DVC pull might have failed."
             exit 1
           fi
-          
-          echo "All essential artifacts verified successfully."
+          echo "✅ All essential artifacts verified successfully."
 
       # 7. Reproducibility Check: Dry-run Docker Builds
       # Validates that Dockerfiles are properly written and dependencies resolve

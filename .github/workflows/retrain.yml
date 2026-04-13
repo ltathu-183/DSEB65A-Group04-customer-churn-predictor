@@ -1,32 +1,75 @@
-name: Retrain
+name: Model Retraining Loop (CT)
 
+# Triggered manually (workflow_dispatch) when data drift is detected
 on:
   workflow_dispatch:
 
 jobs:
-  retrain:
+  retrain-and-update:
+    name: Automating Model Retraining
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      # 1. Checkout the code with full history to allow Git pushing
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      # 2. Set up Python 3.11
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - run: pip install uv
-      - run: uv pip install -r requirements.txt --system
-
-      - name: Retrain
+      # 3. Install uv, DVC, and S3 driver for DagsHub
+      - name: Install MLOps Tools
         run: |
-          python src/models/train.py \
+          pip install uv
+          pip install dvc dvc-s3
+
+      # 4. Pull data from DVC (Cannot train without data!)
+      - name: DVC Pull Training Data
+        env:
+          DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
+        run: |
+          dvc remote modify origin --local auth basic
+          dvc remote modify origin --local user __token__
+          dvc remote modify origin --local password $DAGSHUB_TOKEN
+          dvc pull data/raw/train.csv.dvc
+
+      # 5. Install dependencies from requirements.txt
+      - name: Install Project Dependencies
+        run: uv pip install --system -r requirements.txt mlflow
+
+      # 6. Execute retraining script and log to MLflow
+      - name: Run Retraining
+        env:
+          MLFLOW_TRACKING_URI: https://dagshub.com/${{ github.repository }}.mlflow
+          MLFLOW_TRACKING_USERNAME: ${{ github.actor }}
+          MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_TOKEN }}
+        run: |
+          # Use n_iter=2 for quick demonstration on GitHub Actions
+          python src/models/train_model.py \
             --data data/raw/train.csv \
-            --model_dir models
+            --model_dir models \
+            --n_iter 2
 
-      - name: Commit model
+      # 7. Update DVC and Push New Model Metadata to Git
+      # We use DVC to push the large model and Git to push the .txt/.yaml metadata
+      - name: Commit and Push Model Metadata
+        env:
+          DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
         run: |
+          # Configure Git user for automated commit
           git config --global user.name "mlops-bot"
           git config --global user.email "bot@github.com"
-          git add models/
-          git commit -m "auto retrain"
-          git push
+          
+          # Track the new model with DVC
+          dvc add models/model.pkl
+          dvc push
+          
+          # Add only metadata and .dvc files to Git (Avoiding large binaries)
+          git add models/model.pkl.dvc models/LATEST_VERSION.txt models/baseline_stats.json
+          git commit -m "chore: automated model retrain [skip ci]"
+          git push origin main

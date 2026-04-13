@@ -1,30 +1,56 @@
-name: Drift Monitoring
+name: Data Drift Monitoring
 
+# Trigger: Scheduled to run every hour or manually triggered
 on:
   schedule:
     - cron: "0 * * * *"
   workflow_dispatch:
 
 jobs:
-  monitor:
+  drift-detection:
+    name: Detect Feature Distribution Shift
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      # 1. Checkout source code
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      # 2. Set up Python environment
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - run: pip install uv
-      - run: uv pip install -r requirements.txt --system
+      # 3. Install MLOps tools (uv and DVC)
+      - name: Install uv and DVC
+        run: |
+          pip install uv
+          pip install dvc dvc-s3
 
-      - name: Run Drift Detection
+      # 4. Pull required datasets from DVC (Reference and Current data)
+      - name: DVC Pull Datasets
         env:
-          GITHUB_TOKEN: ${{ secrets.TOKENFORMLOPS }} 
+          DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
+        run: |
+          dvc remote modify origin --local auth basic
+          dvc remote modify origin --local user __token__
+          dvc remote modify origin --local password $DAGSHUB_TOKEN
+          # Pull training data (Reference) and latest production data (Current)
+          dvc pull data/raw/train.csv.dvc data/raw/new_dataset.csv.dvc models/baseline_stats.json.dvc
+
+      # 5. Install Python dependencies for data analysis
+      - name: Install Dependencies
+        run: uv pip install --system -r requirements.txt scipy pandas
+
+      # 6. Run Drift Detection Script (KS-Test)
+      # If the script detects drift, it should print a signal or exit with specific logic
+      - name: Execute Drift Detection
+        env:
+          GITHUB_TOKEN: ${{ secrets.TOKENFORMLOPS }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           python src/monitoring/detect_drift.py \
             --ref data/raw/train.csv \
-            --curr data/raw/test.csv \
+            --curr data/raw/new_dataset.csv \
             --model_dir models
