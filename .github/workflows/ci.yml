@@ -1,50 +1,91 @@
-name: MLOps End-to-End CI
+name: MLOps End-to-End Validation Pipeline
 
 on:
-  pull_request:
-    branches: [ main ]
   push:
-    branches: [ main ]
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+# Cancel previous running jobs on the same branch to save resources
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  quality-assurance:
+  code-quality-and-reproducibility:
+    name: Lint, DVC Pull, and Docker Dry-Run
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
+      # 1. Checkout repository (Pinned to v4 as per best practices)
+      - name: Checkout Repository
         uses: actions/checkout@v4
-        
+
+      # 2. Set up Python environment
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          
-      - name: Install uv
-        run: pip install uv
-        
-      - name: Install dependencies
-        run: |
-          uv pip install --system -r requirements.txt pytest ruff
-          
-      - name: 1. Data Integrity Check
-        run: |
-          echo "Checking datasets..."
-          test -f data/raw/train.csv && echo "✅ train.csv exists"
-          test -f data/raw/new_dataset.csv && echo "✅ new_dataset.csv exists"
+          python-version: "3.11"
 
-      - name: 2. Code Linting (Ruff)
+      # 3. Install uv package manager and core dependencies
+      - name: Install uv and CI Tools
         run: |
+          pip install uv
+          uv pip install --system ruff dvc dvc-s3
+
+      # 4. Fail-Fast: Run Code Linting before heavy operations
+      - name: Run Code Linting (Ruff)
+        run: |
+          echo "Running Ruff to enforce code quality..."
           ruff check src/ streamlit_app/
-          
-      - name: 3. Structural Sanity Check
-        run: |
-          echo "Checking essential MLOps files..."
-          test -f src/api/main.py || (echo "❌ Backend main.py missing" && exit 1)
-          test -f src/models/train_model.py || (echo "❌ Train script missing" && exit 1)
-          test -f streamlit_app/app.py || (echo "❌ Streamlit app missing" && exit 1)
 
-      - name: 4. Dry-run Docker Build
+      # 5. Authenticate and Pull Data/Model from DagsHub via DVC
+      - name: DVC Authentication & Pull Artifacts
+        env:
+          DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
         run: |
-          echo "Testing Docker image builds (Dry-run)..."
-          # Bước này kiểm tra xem Dockerfile của Role 5 có bị lỗi không
-          docker build -t fastapi-test -f Dockerfile .
-          docker build -t streamlit-test -f streamlit_app/Dockerfile ./streamlit_app
+          echo "Authenticating with DagsHub remote..."
+          # Configure DVC to use DagsHub token securely (Basic Auth method)
+          dvc remote modify origin --local auth basic
+          dvc remote modify origin --local user __token__
+          dvc remote modify origin --local password $DAGSHUB_TOKEN
+          
+          echo "Pulling dataset and model artifacts..."
+          dvc pull -v
+
+      # 6. Sanity Check: Ensure DVC successfully pulled the required files
+      - name: Verify Data & Model Existence
+        run: |
+          echo "Checking essential artifacts for reproducibility..."
+          
+          MISSING_FILES=0
+          
+          if [ ! -f "models/model.pkl" ]; then
+            echo "::error::Model artifact (models/model.pkl) is missing!"
+            MISSING_FILES=1
+          fi
+          
+          if [ ! -f "data/raw/train.csv" ]; then
+            echo "::error::Training data (data/raw/train.csv) is missing!"
+            MISSING_FILES=1
+          fi
+          
+          if [ $MISSING_FILES -ne 0 ]; then
+            echo "Sanity check failed. DVC pull might have failed."
+            exit 1
+          fi
+          
+          echo "All essential artifacts verified successfully."
+
+      # 7. Reproducibility Check: Dry-run Docker Builds
+      # Validates that Dockerfiles are properly written and dependencies resolve
+      - name: Dry-Run Docker Builds
+        run: |
+          echo "Verifying FastAPI backend container build..."
+          docker build -t fastapi-dry-run -f Dockerfile .
+          
+          echo "Verifying Streamlit frontend container build..."
+          docker build -t streamlit-dry-run -f streamlit_app/Dockerfile ./streamlit_app
+          
+          echo "Verifying Docker Compose configuration syntax..."
+          docker compose config
