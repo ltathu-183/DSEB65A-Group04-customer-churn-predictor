@@ -28,10 +28,10 @@ jobs:
           python-version: "3.11"
 
       # 3. Install uv and core MLOps tools
-      - name: Install uv and CI Dependencies
+      - name: Install uv and CI Tools
         run: |
-          pip install uv
-          uv pip install --system ruff dvc dvc-s3
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       # 4. Fail-Fast: Check code quality before expensive operations
       - name: Run Code Linting (Ruff)
@@ -39,17 +39,16 @@ jobs:
           echo "Executing Ruff to enforce clean code standards..."
           ruff check src/ streamlit_app/
 
-      # 5. Connect to DagsHub and pull large data/model artifacts
+      # 5. Connect to DagsHub and pull large data artifacts
       - name: DVC Authentication and Pull
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.DVC_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.DVC_SECRET_ACCESS_KEY }}
         run: |
-          echo "Configuring DVC remote with DagsHub token..."
-          dvc remote modify origin --local endpointurl https://dagshub.com/api/v1/repo-buckets/s3/chanhbui297
-          
-          echo "Pulling binary artifacts from remote storage..."
-          dvc pull -v
+          # Configure DVC to use the secret endpoint for DagsHub S3
+          dvc remote modify origin --local endpointurl ${{ secrets.DAGSHUB_S3_ENDPOINT_URL }}
+          # Pull all artifacts required for validation
+          dvc pull
 
       # 6. Sanity Check: Ensure critical files exist for reproducibility
       - name: Verify Artifact Existence

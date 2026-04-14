@@ -26,10 +26,11 @@ jobs:
           python-version: "3.11"
 
       # 3. Install uv package manager and DVC for data retrieval
-      - name: Install uv and DVC
+      - name: Install uv and Dependencies
         run: |
-          pip install uv
-          pip install dvc dvc-s3
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          uv sync --system --no-dev
 
       # 4. Authenticate DVC and pull data from DagsHub
       - name: Pull Data from DVC Remote
@@ -38,7 +39,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.DVC_SECRET_ACCESS_KEY }}
         run: |
           # Configure local authentication for DVC using the GitHub Secret
-          dvc remote modify origin --local endpointurl https://dagshub.com/api/v1/repo-buckets/s3/chanhbui297
+          dvc remote modify origin --local endpointurl ${{ secrets.DAGSHUB_S3_ENDPOINT_URL }
           
           # Pull training data tracked by DVC
           dvc pull data/raw/train.csv.dvc

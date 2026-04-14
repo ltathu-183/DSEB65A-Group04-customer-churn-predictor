@@ -23,10 +23,11 @@ jobs:
           python-version: '3.11'
 
       # 3. Install MLOps tools (uv and DVC)
-      - name: Install uv and DVC
+      - name: Install uv and Dependencies
         run: |
-          pip install uv
-          pip install dvc dvc-s3
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          uv sync --system --no-dev
 
       # 4. Pull required datasets from DVC (Reference and Current data)
       - name: DVC Pull Datasets
@@ -34,7 +35,7 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.DVC_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.DVC_SECRET_ACCESS_KEY }}
         run: |
-          dvc remote modify origin --local endpointurl https://dagshub.com/api/v1/repo-buckets/s3/chanhbui297
+          dvc remote modify origin --local endpointurl ${{ secrets.DAGSHUB_S3_ENDPOINT_URL }
           dvc pull data/raw/train.csv.dvc data/raw/new_dataset.csv.dvc
 
       # 5. Install Python dependencies for data analysis
