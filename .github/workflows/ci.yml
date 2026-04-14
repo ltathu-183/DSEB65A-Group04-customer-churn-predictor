@@ -6,84 +6,70 @@ on:
   pull_request:
     branches: [ "main" ]
 
-# Cancel previous running jobs on the same branch to save resources
+# Cancel outdated runs to save GitHub Action minutes
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  code-quality-and-reproducibility:
-    name: Lint, DVC Pull, and Docker Dry-Run
+  quality-assurance:
+    name: Lint, DVC Pull, and Docker Validation
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout repository with full history
+      # 1. Checkout repository with full history for DVC and Git operations
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 2. Set up Python 3.11 environment for the runner
+      # 2. Set up Python 3.11 environment
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # 3. Install uv package manager and core CI tools
-      - name: Install uv and CI Tools
+      # 3. Install uv and core MLOps tools
+      - name: Install uv and CI Dependencies
         run: |
           pip install uv
           uv pip install --system ruff dvc dvc-s3
 
-      # 4. Fail-Fast: Run Code Linting (Ruff) before heavy operations
+      # 4. Fail-Fast: Check code quality before expensive operations
       - name: Run Code Linting (Ruff)
         run: |
-          echo "Running Ruff to enforce code quality..."
+          echo "Executing Ruff to enforce clean code standards..."
           ruff check src/ streamlit_app/
 
-      # 5. Authenticate and Pull Data/Model from DagsHub via DVC
-      - name: DVC Authentication & Pull Artifacts
+      # 5. Connect to DagsHub and pull large data/model artifacts
+      - name: DVC Authentication and Pull
         env:
           DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
         run: |
-          echo "Authenticating with DagsHub remote..."
-          # Configure DVC to use DagsHub token securely via local config
+          echo "Configuring DVC remote with DagsHub token..."
           dvc remote modify origin --local auth basic
           dvc remote modify origin --local user __token__
           dvc remote modify origin --local password $DAGSHUB_TOKEN
           
-          echo "Pulling dataset and model artifacts..."
+          echo "Pulling binary artifacts from remote storage..."
           dvc pull -v
 
-      # 6. Sanity Check: Ensure DVC successfully pulled the required files
-      - name: Verify Data & Model Existence
+      # 6. Sanity Check: Ensure critical files exist for reproducibility
+      - name: Verify Artifact Existence
         run: |
-          echo "Checking essential artifacts for reproducibility..."
-          MISSING_FILES=0
-          
-          if [ ! -f "models/model.pkl" ]; then
-            echo "::error::Model artifact (models/model.pkl) is missing!"
-            MISSING_FILES=1
-          fi
-          
-          if [ ! -f "data/raw/train.csv" ]; then
-            echo "::error::Training data (data/raw/train.csv) is missing!"
-            MISSING_FILES=1
-          fi
-          
-          if [ $MISSING_FILES -ne 0 ]; then
-            echo "Sanity check failed. DVC pull might have failed."
-            exit 1
-          fi
-          echo "✅ All essential artifacts verified successfully."
+          echo "Verifying pulled files..."
+          # Check if the model and main training data are present
+          test -f models/model.pkl || (echo "::error::model.pkl missing!" && exit 1)
+          test -f data/raw/train.csv || (echo "::error::train.csv missing!" && exit 1)
+          echo "✅ All essential files are present and verified."
 
-      # 7. Reproducibility Check: Dry-run Docker Builds
-      # Validates that Dockerfiles are properly written and dependencies resolve
+      # 7. Reproducibility Check: Validate Dockerization
+      # This ensures the professor can run your project with a single command
       - name: Dry-Run Docker Builds
         run: |
-          echo "Verifying FastAPI backend container build..."
-          docker build -t fastapi-dry-run -f Dockerfile .
+          echo "Building FastAPI backend image..."
+          docker build -t fastapi-test -f Dockerfile .
           
-          echo "Verifying Streamlit frontend container build..."
-          docker build -t streamlit-dry-run -f streamlit_app/Dockerfile ./streamlit_app
+          echo "Building Streamlit frontend image..."
+          docker build -t streamlit-test -f streamlit_app/Dockerfile ./streamlit_app
           
-          echo "Verifying Docker Compose configuration syntax..."
+          echo "Validating Docker Compose orchestration..."
           docker compose config

@@ -29,15 +29,14 @@ jobs:
           pip install dvc dvc-s3
 
       # 4. Pull required datasets from DVC (Reference and Current data)
-      - name: DVC Pull Datasets
-        env:
-          DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
-        run: |
-          dvc remote modify origin --local auth basic
-          dvc remote modify origin --local user __token__
-          dvc remote modify origin --local password $DAGSHUB_TOKEN
-          # Pull training data (Reference) and latest production data (Current)
-          dvc pull data/raw/train.csv.dvc data/raw/new_dataset.csv.dvc models/baseline_stats.json.dvc
+    - name: DVC Pull Datasets
+            env:
+              DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
+            run: |
+              dvc remote modify origin --local auth basic
+              dvc remote modify origin --local user __token__
+              dvc remote modify origin --local password $DAGSHUB_TOKEN
+              dvc pull data/raw/train.csv.dvc data/raw/new_dataset.csv.dvc
 
       # 5. Install Python dependencies for data analysis
       - name: Install Dependencies
