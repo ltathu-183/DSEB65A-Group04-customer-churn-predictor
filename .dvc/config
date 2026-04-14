@@ -3,6 +3,3 @@
     autostage = true
 ['remote "origin"']
     url = s3://DSEB65A-Group04-customer-churn-predictor
-    endpointurl = https://dagshub.com/api/v1/repo-buckets/s3/chanhbui297
-    access_key_id = b11d99ae81026eecadf6f973f99279ff2e238cee
-    secret_access_key = b11d99ae81026eecadf6f973f99279ff2e238cee
