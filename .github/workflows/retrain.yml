@@ -31,14 +31,12 @@ jobs:
       # 4. Authenticate and Pull training data from DagsHub
       - name: DVC Pull Training Data
         env:
-          DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.DVC_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.DVC_SECRET_ACCESS_KEY }}
         run: |
           # Configure DVC credentials locally for the runner session
-          dvc remote modify origin --local auth basic
-          dvc remote modify origin --local user __token__
-          dvc remote modify origin --local password $DAGSHUB_TOKEN
-          # Pull training data tracked by DVC
-          dvc pull data/raw/train.csv.dvc
+          dvc remote modify origin --local endpointurl https://dagshub.com/api/v1/repo-buckets/s3/chanhbui297
+          dvc pull data/raw/train.csv.dvc          # Pull training data tracked by DVC
 
       # 5. Install dependencies from requirements.txt
       - name: Install Project Dependencies

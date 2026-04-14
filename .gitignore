@@ -28,6 +28,10 @@ data/processed/*.csv
 data/preprocessed/*.csv
 data/preprocessed/*.parquet
 
+# Models
+models/*
+!model.pkl.dvc
+
 # OS-specific & IDE
 .DS_Store
 Thumbs.db

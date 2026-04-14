@@ -42,12 +42,11 @@ jobs:
       # 5. Connect to DagsHub and pull large data/model artifacts
       - name: DVC Authentication and Pull
         env:
-          DAGSHUB_TOKEN: ${{ secrets.DAGSHUB_TOKEN }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.DVC_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.DVC_SECRET_ACCESS_KEY }}
         run: |
           echo "Configuring DVC remote with DagsHub token..."
-          dvc remote modify origin --local auth basic
-          dvc remote modify origin --local user __token__
-          dvc remote modify origin --local password $DAGSHUB_TOKEN
+          dvc remote modify origin --local endpointurl https://dagshub.com/api/v1/repo-buckets/s3/chanhbui297
           
           echo "Pulling binary artifacts from remote storage..."
           dvc pull -v
