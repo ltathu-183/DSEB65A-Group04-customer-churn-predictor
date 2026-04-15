@@ -1,0 +1,28 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: churn-app-ingress
+  namespace: churn-app
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: ui.churn.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: churn-ui
+                port:
+                  number: 8501
+    - host: api.churn.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: churn-api
+                port:
+                  number: 8000

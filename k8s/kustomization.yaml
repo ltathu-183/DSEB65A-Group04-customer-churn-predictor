@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: churn-app
+resources:
+  - namespace.yaml
+  - fastapi-deployment.yaml
+  - fastapi-service.yaml
+  - streamlit-deployment.yaml
+  - streamlit-service.yaml
+  - ingress.yaml

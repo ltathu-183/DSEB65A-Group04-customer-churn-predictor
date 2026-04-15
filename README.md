@@ -100,3 +100,82 @@ Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/predict" -ContentType
 
 ## Notes
 - Feature engineering is **stateless per row** (no lag / rolling windows). The API applies the same feature creation as training (`create_features`) before calling the saved sklearn pipeline.
+
+## Full run guide
+
+### *First setup:*
+
+**Step 0: Open project**
+```bash
+git clone https://github.com/chanhbui297/DSEB65A-Group04-customer-churn-predictor.git
+cd DSEB65A-Group04-customer-churn-predictor
+```
+
+**Step 1: Start Kubernetes**
+- Open Docker Desktop
+- Make sure Kubernetes = Running
+
+Verify:
+```bash
+kubectl get nodes
+```
+Expected:
+```bash
+desktop-control-plane   Ready
+```
+
+**Step 2: Deploy to Kubernetes**
+```bash
+kubectl apply -k k8s
+```
+
+**Step 3: Check everything**
+```bash
+kubectl get pods -n churn-app
+```
+Expected:
+```bash
+churn-api-xxxx  Running
+churn-ui-xxxx   Running
+```
+**Step 4: Setup domain (only first time)**
+
+Open hosts files:
+
+| Operating System | File |
+| :------------: | :-----------: |
+| Windows | C:\Windows\System32\drivers\etc\hosts |
+| macOS | /etc/hosts |
+| Linux | /etc/hosts |
+
+Add and save:
+
+```bash
+127.0.0.1 ui.churn.local
+127.0.0.1 api.churn.local
+```
+
+**Step 5: Start ingress**
+```bash
+kubectl get pods -n ingress-nginx
+```
+Expected:
+```bash
+ingress-nginx-controller-xxxx   Running
+```
+
+**Step 6: Run the app**
+
+Open browser:
+```
+http://ui.churn.local
+```
+
+### *Daily Workflow (after first setup):*
+```bash
+kubectl apply -k k8s
+```
+Then open:
+```
+http://ui.churn.local
+```
