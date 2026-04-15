@@ -1,55 +1,111 @@
-name: Data Drift Monitoring
+name: Drift Monitoring
 
-# Trigger: Scheduled to run every hour or manually triggered
 on:
   schedule:
-    - cron: "0 * * * *"
+    - cron: "0 * * * *"  # Every hour
   workflow_dispatch:
 
 jobs:
-  drift-detection:
-    name: Detect Feature Distribution Shift
+  monitor:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: write
+      issues: write
 
     steps:
-      # 1. Checkout source code
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # 2. Set up Python environment
-      - name: Set up Python 3.11
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      # 3. Install MLOps tools (uv and DVC)
-      - name: Install uv and Dependencies
-        run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          uv sync --system --no-dev
+      - name: Setup uv cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
 
-      # 4. Pull required datasets from DVC (Reference and Current data)
-      - name: DVC Pull Datasets
+      - name: Install dependencies and DVC
+        run: |
+          pip install uv
+          uv pip install . dvc[s3] --system
+
+      - name: Pull Data from DVC
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.DVC_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.DVC_SECRET_ACCESS_KEY }}
         run: |
-          dvc remote modify origin --local endpointurl ${{ secrets.DAGSHUB_S3_ENDPOINT_URL }
-          dvc pull data/raw/train.csv.dvc data/raw/new_dataset.csv.dvc
+          dvc pull data/raw/train.csv.dvc
+          if [ -f "data/raw/new_dataset.csv.dvc" ]; then
+            dvc pull data/raw/new_dataset.csv.dvc
+          fi
 
-      # 5. Install Python dependencies for data analysis
-      - name: Install Dependencies
-        run: uv pip install --system -r requirements.txt scipy pandas
-
-      # 6. Run Drift Detection Script (KS-Test)
-      # If the script detects drift, it should print a signal or exit with specific logic
-      - name: Execute Drift Detection
-        env:
-          GITHUB_TOKEN: ${{ secrets.TOKENFORMLOPS }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
+      - name: Install GitHub CLI (for issue creation)
         run: |
-          python src/monitoring/detect_drift.py \
+          type -p curl >/dev/null || sudo apt update && sudo apt install curl -y
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          sudo apt update && sudo apt install gh -y
+
+      - name: Run Drift Detection
+        id: drift_check
+        run: |
+          python monitoring/detect_drift.py \
             --ref data/raw/train.csv \
             --curr data/raw/new_dataset.csv \
-            --model_dir models
+            --model_dir models \
+            --config config/drift_config.yaml
+        env:
+          TOKENFORMLOPS: ${{ secrets.TOKENFORMLOPS }}
+
+      - name: Check for critical drift in logs
+        if: always()
+        id: check_drift
+        run: |
+          if grep -q "CRITICAL DRIFT DETECTED" logs/monitoring.log 2>/dev/null; then
+            echo "critical_drift=true" >> $GITHUB_OUTPUT
+            echo "Critical drift detected in logs"
+          else
+            echo "critical_drift=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload monitoring logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: monitoring-logs-${{ github.run_id }}
+          path: logs/
+          retention-days: 7
+
+      - name: Create Issue Alert
+        if: failure() || steps.check_drift.outputs.critical_drift == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.TOKENFORMLOPS }}
+        run: |
+          STATUS="${{ job.status }}"
+          DRIFT_STATUS="Detected" if [ "${{ steps.check_drift.outputs.critical_drift }}" = "true" ]; else "None"; fi
+          
+          gh issue create \
+            --title " Drift Alert: ${{ github.repository }} #${{ github.run_id }}" \
+            --body "### Status
+          • Workflow: \`${{ github.workflow }}\`
+          • Result: \`${STATUS}\`
+          • Critical Drift: \`${DRIFT_STATUS}\`
+          
+          ### Details
+          • Run Link: [View logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          • Artifacts: [Download logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          
+          ### Action Required
+          1. Check uploaded artifacts for \`monitoring.log\`
+          2. Review drift details in log file
+          3. Verify if auto-retrain was triggered
+          4. Investigate data quality if needed" \
+            --label "mlops,drift,alert" \
+            2>/dev/null || echo "Could not create GitHub issue"

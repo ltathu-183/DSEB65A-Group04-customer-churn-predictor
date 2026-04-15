@@ -1,0 +1,16 @@
+drift:
+  p_value_threshold: 0.05
+  psi_threshold: 0.20
+  
+paths:
+  default_train: data/raw/train.csv
+  default_test: data/raw/new_dataset.csv
+  model_dir: models/
+  
+alerting:
+  critical_drift_count: 3
+
+model_artifacts:
+  output_dir: models/
+  version_format: "run_{timestamp}"
+  keep_versions: 5

@@ -1,0 +1,71 @@
+2026-04-15 20:31:14,915 - INFO - [detect_drift.py:90] - Loaded config from config/drift_config.yaml
+2026-04-15 20:31:14,927 - INFO - [detect_drift.py:125] - Loaded baseline stats from models\baseline_stats.json
+2026-04-15 20:31:14,927 - INFO - [detect_drift.py:143] - Loading model from models\model.pkl
+2026-04-15 20:31:15,394 - INFO - [detect_drift.py:324] - Loading reference: data\raw\train.csv | Current: data\raw\new_dataset.csv
+2026-04-15 20:31:15,994 - ERROR - [detect_drift.py:184] - [INTEGRITY FAIL] Serving Data: Missing required columns: ['Income']
+2026-04-15 20:31:15,998 - INFO - [detect_drift.py:405] - --------------------------------------------------------------------------------
+2026-04-15 20:31:16,000 - WARNING - [detect_drift.py:411] - Drift detected in 1 features: ['INTEGRITY_FAILURE']
+2026-04-15 20:31:16,000 - INFO - [detect_drift.py:418] - System stable. No retrain needed.
+2026-04-15 20:40:57,254 - INFO - [detect_drift.py:90] - Loaded config from config/drift_config.yaml
+2026-04-15 20:40:57,255 - INFO - [detect_drift.py:125] - Loaded baseline stats from models\baseline_stats.json
+2026-04-15 20:40:57,256 - INFO - [detect_drift.py:143] - Loading model from models\model.pkl
+2026-04-15 20:40:57,738 - INFO - [detect_drift.py:326] - Loading reference: data\raw\train.csv | Current: data\raw\new_dataset.csv
+2026-04-15 20:40:58,309 - INFO - [detect_drift.py:189] - [INTEGRITY OK] Serving Data passed basic checks.
+2026-04-15 20:40:58,310 - INFO - [detect_drift.py:333] - ================================================================================
+2026-04-15 20:40:58,310 - INFO - [detect_drift.py:334] - DRIFT CHECK: train.csv vs new_dataset.csv
+2026-04-15 20:40:58,310 - INFO - [detect_drift.py:335] - ================================================================================
+2026-04-15 20:40:58,370 - INFO - [detect_drift.py:239] - [DRIFT] Age                | KS p-val: 0.0000 | PSI: 0.1244
+2026-04-15 20:40:58,461 - INFO - [detect_drift.py:252] - [DRIFT] Gender             | Chi2 p-val: 0.0000
+2026-04-15 20:40:58,525 - INFO - [detect_drift.py:239] - [DRIFT] Support Calls      | KS p-val: 0.0000 | PSI: 0.3821
+2026-04-15 20:40:58,578 - INFO - [detect_drift.py:239] - [DRIFT] Payment Delay      | KS p-val: 0.0000 | PSI: 0.2951
+2026-04-15 20:40:58,647 - INFO - [detect_drift.py:239] - [DRIFT] Total Spend        | KS p-val: 0.0000 | PSI: 0.1616
+2026-04-15 20:40:58,761 - INFO - [detect_drift.py:239] - [STABLE] Last Interaction   | KS p-val: 0.0000 | PSI: 0.0186
+2026-04-15 20:41:06,105 - INFO - [detect_drift.py:273] - Confidence mean: 0.9516 | std: 0.2084
+2026-04-15 20:41:06,143 - INFO - [detect_drift.py:280] - [DRIFT] PREDICTION DRIFT | KS p-val: 0.0000 | PSI: 1.2751
+2026-04-15 20:41:06,159 - INFO - [detect_drift.py:407] - --------------------------------------------------------------------------------
+2026-04-15 20:41:06,159 - WARNING - [detect_drift.py:413] - Drift detected in 5 features: ['Age', 'Gender', 'Support Calls', 'Payment Delay', 'Total Spend']
+2026-04-15 20:41:06,160 - ERROR - [detect_drift.py:417] - CRITICAL DRIFT DETECTED
+2026-04-15 20:41:06,162 - WARNING - [detect_drift.py:294] - Critical drift detected. Sending trigger to GitHub Actions...
+2026-04-15 20:41:06,162 - ERROR - [detect_drift.py:300] - GITHUB_TOKEN not found. Cannot trigger retraining.
+2026-04-15 20:41:30,891 - INFO - [detect_drift.py:90] - Loaded config from config/drift_config.yaml
+2026-04-15 20:41:30,892 - INFO - [detect_drift.py:125] - Loaded baseline stats from models\baseline_stats.json
+2026-04-15 20:41:30,893 - INFO - [detect_drift.py:143] - Loading model from models\model.pkl
+2026-04-15 20:41:31,356 - INFO - [detect_drift.py:326] - Loading reference: data\raw\train.csv | Current: data\raw\new_dataset.csv
+2026-04-15 20:41:31,926 - INFO - [detect_drift.py:189] - [INTEGRITY OK] Serving Data passed basic checks.
+2026-04-15 20:41:31,927 - INFO - [detect_drift.py:333] - ================================================================================
+2026-04-15 20:41:31,927 - INFO - [detect_drift.py:334] - DRIFT CHECK: train.csv vs new_dataset.csv
+2026-04-15 20:41:31,928 - INFO - [detect_drift.py:335] - ================================================================================
+2026-04-15 20:41:31,982 - INFO - [detect_drift.py:239] - [DRIFT] Age                | KS p-val: 0.0000 | PSI: 0.1244
+2026-04-15 20:41:32,057 - INFO - [detect_drift.py:252] - [DRIFT] Gender             | Chi2 p-val: 0.0000
+2026-04-15 20:41:32,106 - INFO - [detect_drift.py:239] - [DRIFT] Support Calls      | KS p-val: 0.0000 | PSI: 0.3821
+2026-04-15 20:41:32,155 - INFO - [detect_drift.py:239] - [DRIFT] Payment Delay      | KS p-val: 0.0000 | PSI: 0.2951
+2026-04-15 20:41:32,215 - INFO - [detect_drift.py:239] - [DRIFT] Total Spend        | KS p-val: 0.0000 | PSI: 0.1616
+2026-04-15 20:41:32,334 - INFO - [detect_drift.py:239] - [STABLE] Last Interaction   | KS p-val: 0.0000 | PSI: 0.0186
+2026-04-15 20:41:39,200 - INFO - [detect_drift.py:273] - Confidence mean: 0.9516 | std: 0.2084
+2026-04-15 20:41:39,239 - INFO - [detect_drift.py:280] - [DRIFT] PREDICTION DRIFT | KS p-val: 0.0000 | PSI: 1.2751
+2026-04-15 20:41:39,251 - INFO - [detect_drift.py:407] - --------------------------------------------------------------------------------
+2026-04-15 20:41:39,252 - WARNING - [detect_drift.py:413] - Drift detected in 5 features: ['Age', 'Gender', 'Support Calls', 'Payment Delay', 'Total Spend']
+2026-04-15 20:41:39,252 - ERROR - [detect_drift.py:417] - CRITICAL DRIFT DETECTED
+2026-04-15 20:41:39,253 - WARNING - [detect_drift.py:294] - Critical drift detected. Sending trigger to GitHub Actions...
+2026-04-15 20:41:39,253 - ERROR - [detect_drift.py:300] - GITHUB_TOKEN not found. Cannot trigger retraining.
+2026-04-15 20:45:14,494 - INFO - [detect_drift.py:90] - Loaded config from config/drift_config.yaml
+2026-04-15 20:45:14,495 - INFO - [detect_drift.py:125] - Loaded baseline stats from models\baseline_stats.json
+2026-04-15 20:45:14,496 - INFO - [detect_drift.py:143] - Loading model from models\model.pkl
+2026-04-15 20:45:15,075 - INFO - [detect_drift.py:326] - Loading reference: data\raw\train.csv | Current: data\raw\new_dataset.csv
+2026-04-15 20:45:15,727 - INFO - [detect_drift.py:189] - [INTEGRITY OK] Serving Data passed basic checks.
+2026-04-15 20:45:15,728 - INFO - [detect_drift.py:333] - ================================================================================
+2026-04-15 20:45:15,729 - INFO - [detect_drift.py:334] - DRIFT CHECK: train.csv vs new_dataset.csv
+2026-04-15 20:45:15,729 - INFO - [detect_drift.py:335] - ================================================================================
+2026-04-15 20:45:15,787 - INFO - [detect_drift.py:239] - [DRIFT] Age                | KS p-val: 0.0000 | PSI: 0.1244
+2026-04-15 20:45:15,879 - INFO - [detect_drift.py:252] - [DRIFT] Gender             | Chi2 p-val: 0.0000
+2026-04-15 20:45:15,937 - INFO - [detect_drift.py:239] - [DRIFT] Support Calls      | KS p-val: 0.0000 | PSI: 0.3821
+2026-04-15 20:45:15,993 - INFO - [detect_drift.py:239] - [DRIFT] Payment Delay      | KS p-val: 0.0000 | PSI: 0.2951
+2026-04-15 20:45:16,073 - INFO - [detect_drift.py:239] - [DRIFT] Total Spend        | KS p-val: 0.0000 | PSI: 0.1616
+2026-04-15 20:45:16,268 - INFO - [detect_drift.py:239] - [STABLE] Last Interaction   | KS p-val: 0.0000 | PSI: 0.0186
+2026-04-15 20:45:24,783 - INFO - [detect_drift.py:273] - Confidence mean: 0.9516 | std: 0.2084
+2026-04-15 20:45:24,821 - INFO - [detect_drift.py:280] - [DRIFT] PREDICTION DRIFT | KS p-val: 0.0000 | PSI: 1.2751
+2026-04-15 20:45:24,835 - INFO - [detect_drift.py:411] - --------------------------------------------------------------------------------
+2026-04-15 20:45:24,835 - WARNING - [detect_drift.py:417] - Drift detected in 5 features: ['Age', 'Gender', 'Support Calls', 'Payment Delay', 'Total Spend']
+2026-04-15 20:45:24,835 - ERROR - [detect_drift.py:421] - CRITICAL DRIFT DETECTED
+2026-04-15 20:45:24,837 - WARNING - [detect_drift.py:294] - Critical drift detected. Sending trigger to GitHub Actions...
+2026-04-15 20:45:24,837 - ERROR - [detect_drift.py:300] - GITHUB_TOKEN not found. Cannot trigger retraining.

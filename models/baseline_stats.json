@@ -1,88 +1,51 @@
 {
-    "CustomerID": {
-        "mean": 225398.66795513936,
-        "std": 129531.91854954744,
-        "min": 2.0,
-        "max": 449999.0,
-        "type": "numeric"
-    },
-    "Age": {
-        "mean": 39.37315349157956,
-        "std": 12.442369490866625,
-        "min": 18.0,
-        "max": 65.0,
-        "type": "numeric"
-    },
-    "Gender": {
-        "categories": [
-            "Female",
-            "Male"
-        ],
-        "type": "categorical"
-    },
-    "Tenure": {
-        "mean": 31.25633574695122,
-        "std": 17.255727385042206,
-        "min": 1.0,
-        "max": 60.0,
-        "type": "numeric"
-    },
-    "Usage Frequency": {
-        "mean": 15.80749355763647,
-        "std": 8.586241645186686,
-        "min": 1.0,
-        "max": 30.0,
-        "type": "numeric"
-    },
-    "Support Calls": {
-        "mean": 3.6044366107723578,
-        "std": 3.070217877688797,
-        "min": 0.0,
-        "max": 10.0,
-        "type": "numeric"
-    },
-    "Payment Delay": {
-        "mean": 12.965721635452962,
-        "std": 8.258062517501818,
-        "min": 0.0,
-        "max": 30.0,
-        "type": "numeric"
-    },
-    "Subscription Type": {
-        "categories": [
-            "Standard",
-            "Basic",
-            "Premium"
-        ],
-        "type": "categorical"
-    },
-    "Contract Length": {
-        "categories": [
-            "Annual",
-            "Monthly",
-            "Quarterly"
-        ],
-        "type": "categorical"
-    },
-    "Total Spend": {
-        "mean": 631.6162227787457,
-        "std": 240.8030011205686,
-        "min": 100.0,
-        "max": 1000.0,
-        "type": "numeric"
-    },
-    "Last Interaction": {
-        "mean": 14.480867995063878,
-        "std": 8.59620768302461,
-        "min": 1.0,
-        "max": 30.0,
-        "type": "numeric"
-    },
-    "Churn": {
-        "mean": 0.5671071972996515,
-        "std": 0.4954767209119781,
-        "min": 0.0,
-        "max": 1.0,
-        "type": "numeric"
-    }
+  "Age": {
+    "mean": 39.37315349157956,
+    "std": 12.442369490866625,
+    "min": 18.0,
+    "max": 65.0,
+    "null_ratio": 0.0,
+    "type": "numeric"
+  },
+  "Gender": {
+    "categories": [
+      "Female",
+      "Male"
+    ],
+    "n_unique": 2,
+    "null_ratio": 0.0,
+    "type": "categorical"
+  },
+  "Support Calls": {
+    "mean": 3.6044366107723578,
+    "std": 3.070217877688797,
+    "min": 0.0,
+    "max": 10.0,
+    "null_ratio": 0.0,
+    "type": "numeric"
+  },
+  "Payment Delay": {
+    "mean": 12.965721635452962,
+    "std": 8.258062517501818,
+    "min": 0.0,
+    "max": 30.0,
+    "null_ratio": 0.0,
+    "type": "numeric"
+  },
+  "Total Spend": {
+    "mean": 631.6162227787457,
+    "std": 240.8030011205686,
+    "min": 100.0,
+    "max": 1000.0,
+    "null_ratio": 0.0,
+    "type": "numeric"
+  },
+  "Last Interaction": {
+    "mean": 14.480867995063878,
+    "std": 8.59620768302461,
+    "min": 1.0,
+    "max": 30.0,
+    "null_ratio": 0.0,
+    "type": "numeric"
+  }
 }
