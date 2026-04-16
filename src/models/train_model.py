@@ -24,6 +24,7 @@ from sklearn.model_selection import RandomizedSearchCV, train_test_split  # noqa
 from sklearn.pipeline import Pipeline  # noqa: E402
 
 from src.features.engineer import FeatureEngineer, create_preprocessor  # noqa: E402
+from src.preprocess.preprocessor import preprocess  # noqa: E402
 
 # -----------------------------
 # Logging Configuration
@@ -217,6 +218,17 @@ def main(args):
     save_baseline_stats(df, version_dir, exclude_cols=exclude_cols)
 
     # 5. Prepare data
+    df = preprocess(df=df)
+
+    # --- Store PREPROCESS ---
+    processed_data_path = root_dir / "data" / "preprocessed"
+    processed_data_path.mkdir(parents=True, exist_ok=True) # create folder in case not exist
+    
+    output_file = processed_data_path / "train.parquet"
+    df.to_csv(output_file, index=False)
+    logger.info(f" Preprocessed data saved to: {output_file}")
+    # ------------------------------
+
     X, y = df.drop(columns=[target]), df[target]
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=config["training"]["test_size"], 
