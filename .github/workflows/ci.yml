@@ -1,4 +1,4 @@
-name: MLOps End-to-End Validation Pipeline
+name: MLOps End-to-End Validation Pipeline (DAG)
 
 on:
   push:
@@ -6,68 +6,99 @@ on:
   pull_request:
     branches: [ "main" ]
 
-# Cancel outdated runs to save GitHub Action minutes
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  quality-assurance:
-    name: Lint, DVC Pull, and Docker Validation
+  # ==========================================
+  # NODE 1: Static Code Analysis (Fail-Fast)
+  # ==========================================
+  lint:
+    name: Code Linting (Ruff)
     runs-on: ubuntu-latest
-
     steps:
-      # 1. Checkout repository with full history for DVC and Git operations
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Set up Python 3.11 environment
-      - name: Set up Python 3.11
+      # Use official uv action - it automatically handles aggressive caching!
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # 3. Install uv and core MLOps tools
-      - name: Install uv and CI Tools
-        run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      - name: Install Ruff
+        run: uv pip install ruff --system
 
-      # 4. Fail-Fast: Check code quality before expensive operations
-      - name: Run Code Linting (Ruff)
+      - name: Run Ruff
         run: |
-          echo "Executing Ruff to enforce clean code standards..."
-          ruff check src/ streamlit_app/
+          echo "Executing ruff..."
+          ruff check src/ streamlit_app/ || (echo "::error::Ruff found issues" && exit 1)
 
-      # 5. Connect to DagsHub and pull large data artifacts
-      - name: DVC Authentication and Pull
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.DVC_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.DVC_SECRET_ACCESS_KEY }}
+  # ==========================================
+  # NODE 2: Data & Integration Validation
+  # ==========================================
+  build-and-validate:
+    name: DVC Pull & Docker Validation
+    needs: lint  # DAG logic: Only run heavy operations if code is clean
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.DVC_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.DVC_SECRET_ACCESS_KEY }}
+      DAGSHUB_S3_ENDPOINT_URL: ${{ secrets.DAGSHUB_S3_ENDPOINT_URL }}
+    
+    # All steps here run on the SAME Virtual Machine, sharing the local disk
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install DVC
+        run: uv pip install dvc[s3] --system
+
+      # Step 1: Pull heavy artifacts to current VM disk
+      - name: Configure DVC remote and pull
         run: |
-          # Configure DVC to use the secret endpoint for DagsHub S3
-          dvc remote modify origin --local endpointurl ${{ secrets.DAGSHUB_S3_ENDPOINT_URL }}
-          # Pull all artifacts required for validation
-          dvc pull
+          # Configure runner-local remote credentials
+          dvc remote modify origin --local access_key_id $AWS_ACCESS_KEY_ID
+          dvc remote modify origin --local secret_access_key $AWS_SECRET_ACCESS_KEY
+          dvc remote modify origin --local endpointurl $DAGSHUB_S3_ENDPOINT_URL
 
-      # 6. Sanity Check: Ensure critical files exist for reproducibility
-      - name: Verify Artifact Existence
+          # Pull artifacts
+          dvc pull --verbose || (echo "::error::DVC pull failed." && exit 1)
+
+      # Step 2: Verify artifacts on the SAME VM
+      - name: Verify artifacts existence
         run: |
           echo "Verifying pulled files..."
-          # Check if the model and main training data are present
-          test -f models/model.pkl || (echo "::error::model.pkl missing!" && exit 1)
-          test -f data/raw/train.csv || (echo "::error::train.csv missing!" && exit 1)
-          echo "✅ All essential files are present and verified."
+          test -f models/model.pkl || (echo "::error::models/model.pkl missing" && exit 1)
+          test -f data/raw/train.csv || (echo "::error::data/raw/train.csv missing" && exit 1)
+          echo "✅ Essential files present"
 
-      # 7. Reproducibility Check: Validate Dockerization
-      # This ensures the professor can run your project with a single command
-      - name: Dry-Run Docker Builds
+      # Step 3: Build Docker (which needs the pulled model/data to exist on disk)
+      - name: Dry-run Docker builds
         run: |
           echo "Building FastAPI backend image..."
-          docker build -t fastapi-test -f Dockerfile .
-          
+          docker build -t fastapi-test -f Dockerfile . || (echo "::error::Docker build backend failed" && exit 1)
+
           echo "Building Streamlit frontend image..."
-          docker build -t streamlit-test -f streamlit_app/Dockerfile ./streamlit_app
-          
-          echo "Validating Docker Compose orchestration..."
-          docker compose config
+          docker build -t streamlit-test -f streamlit_app/Dockerfile ./streamlit_app || (echo "::error::Docker build frontend failed" && exit 1)
+
+          echo "Validating Docker Compose configuration..."
+          docker compose config || (echo "::error::docker compose config invalid" && exit 1)

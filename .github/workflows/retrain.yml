@@ -48,13 +48,20 @@ jobs:
           uv pip install . dvc[s3] --system
 
       # 4. Pull data from DVC 
+      # 4. Pull data from DVC 
       - name: Pull training data from DVC
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.DVC_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.DVC_SECRET_ACCESS_KEY }}
+          DAGSHUB_S3_ENDPOINT_URL: ${{ secrets.DAGSHUB_S3_ENDPOINT_URL }}
         run: |
-          # Pull training data (required)
-          dvc pull ${{ env.DATA_PATH }}.vc || echo "Warning: DVC pull failed, checking if file exists locally"
+          # Configure DVC remote with runner-local credentials
+          dvc remote modify origin --local access_key_id $AWS_ACCESS_KEY_ID
+          dvc remote modify origin --local secret_access_key $AWS_SECRET_ACCESS_KEY
+          dvc remote modify origin --local endpointurl $DAGSHUB_S3_ENDPOINT_URL
+
+          # Correct: pull the .dvc pointer file (was typo .vc)
+          dvc pull ${{ env.DATA_PATH }}.dvc || echo "Warning: DVC pull failed, checking if file exists locally"
           
           # Verify data exists
           if [ ! -f "${{ env.DATA_PATH }}" ]; then
@@ -100,60 +107,41 @@ jobs:
           cat ${{ env.MODEL_DIR }}/metadata.json | python -m json.tool | grep -A 10 '"metrics"'
 
       # 7. (Optional) Backup old model BEFORE commit
-      - name: Backup previous model version
-        if: always()  # Run even if training fails, for audit trail
-        run: |
-          BACKUP_DIR="models/backup/$(date +%Y%m%d_%H%M%S)"
-          mkdir -p "$BACKUP_DIR"
-          
-          # Copy current artifacts if they exist
-          for f in model.pkl metadata.json baseline_stats.json; do
-            if [ -f "models/$f" ]; then
-              cp "models/$f" "$BACKUP_DIR/"
-            fi
-          done
-          
-          # Keep only last 3 backups in Git (avoid repo bloat)
-          if [ -d "models/backup" ]; then
-            cd models/backup
-            ls -dt */ | tail -n +4 | xargs -r rm -rf
-            cd ../..
-          fi
-          
-          echo "Backup saved to $BACKUP_DIR"
-
-      # 8. Commit and push updated models
-      - name: Commit and Push Models
         if: success()  # Only commit if training succeeded
         run: |
           git config --global user.name "mlops-bot"
           git config --global user.email "mlops-bot@github.com"
-          
-          # Stage model artifacts (not the version folders, just the pointers)
+
+          # Use DVC to track and push the heavy model artifact instead of committing raw file
+          dvc add ${{ env.MODEL_DIR }}/model.pkl
+          # push model to remote (must succeed before committing .dvc pointer)
+          dvc push || (echo "::error::DVC push failed. Check DVC remote & credentials." && exit 1)
+
+          # Stage pointer files and lightweight metadata for Git
           git add \
-            ${{ env.MODEL_DIR }}/model.pkl \
+            ${{ env.MODEL_DIR }}/model.pkl.dvc \
             ${{ env.MODEL_DIR }}/metadata.json \
             ${{ env.MODEL_DIR }}/baseline_stats.json \
             ${{ env.MODEL_DIR }}/latest \
             ${{ env.MODEL_DIR }}/LATEST_VERSION.txt
-          
+
           # Add backup if any changes
           git add ${{ env.MODEL_DIR }}/backup/ 2>/dev/null || true
-          
+
           # Generate commit message with run info
           SHORT_SHA=$(git rev-parse --short HEAD)
           COMMIT_MSG="auto-retrain: models updated [run=${{ github.run_id }} sha=${SHORT_SHA}] [skip ci]"
-          
-          # Commit (allow empty in case no changes, though unlikely)
+
+          # Commit (allow empty in case no changes)
           git commit -m "$COMMIT_MSG" || echo " No changes to commit"
-          
+
           # Push with retry logic
           for i in 1 2 3; do
             git push origin HEAD:main && break
             echo "Push attempt $i failed, retrying in 5s..."
             sleep 5
           done
-          
+
           echo "Models committed and pushed"
 
       # 9. Post-training evaluation (optional but recommended)

@@ -39,14 +39,14 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.DVC_SECRET_ACCESS_KEY }}
         run: |
           # Configure local authentication for DVC using the GitHub Secret
-          dvc remote modify origin --local endpointurl ${{ secrets.DAGSHUB_S3_ENDPOINT_URL }
+          dvc remote modify origin --local endpointurl ${{ secrets.DAGSHUB_S3_ENDPOINT_URL }}
           
           # Pull training data tracked by DVC
           dvc pull data/raw/train.csv.dvc
 
       # 5. Install Python dependencies defined in pyproject.toml
       - name: Install Dependencies
-        run: uv pip install --system -r requirements.txt mlflow dvc dvc-s3
+        run: uv sync --system --no-dev
 
       # 6. Run the training script and log results to DagsHub MLflow
       - name: Execute Training Script

@@ -19,7 +19,7 @@ import yaml  # noqa: E402
 import numpy as np  # noqa: E402
 from sklearn.ensemble import RandomForestClassifier  # noqa: E402
 from sklearn.metrics import (accuracy_score, f1_score, precision_score, 
-                             recall_score, roc_auc_score)  # noqa: E402
+                            recall_score, roc_auc_score)  # noqa: E402
 from sklearn.model_selection import RandomizedSearchCV, train_test_split  # noqa: E402
 from sklearn.pipeline import Pipeline  # noqa: E402
 
