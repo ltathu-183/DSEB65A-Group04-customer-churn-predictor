@@ -24,5 +24,6 @@ dependencies = [
     "uvicorn>=0.44.0",
     "prometheus-client>=0.21.0",
     "prometheus-fastapi-instrumentator>=7.0.0",
+    "requests>=2.33.1",
     "dvc[s3]>=3.67.1",
 ]

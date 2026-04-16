@@ -1,39 +1,52 @@
-# Virtual environments
-.venv/
-venv/
-env/
-
-# Python artifacts
+# =====================
+# Python & Environment
+# =====================
 __pycache__/
 *.py[cod]
+.env
+.venv/
+venv/
 *.egg-info/
-.pytest_cache/
 
-# Jupyter artifacts
-.ipynb_checkpoints/
+# =====================
+# Logs & Monitoring Config (SỬA LỖI Ở ĐÂY)
+# =====================
+logs/
+*.log
+# Chỉ ignore các file json rác, GIỮ LẠI file cấu hình quan trọng
+*.json
+!monitoring/**/*.json
+!config/**/*.json
+!models/*.json
 
-# ML model files (Giữ lại pipeline nếu cần, nhưng chặn model nặng)
-
-*.pt
-*.pth
-*.h5
-
-# Experiment tracking
+# =====================
+# ML artifacts & Models
+# =====================
+models/run_*
 mlruns/
 mlflow.db
+# Giữ lại các file code train model
+!models/*.py
 
-# Data 
-data/raw/*.csv
-data/processed/*.csv
-data/preprocessed/*.csv
-data/preprocessed/*.parquet
+# =====================
+# Data & DVC (QUAN TRỌNG NHẤT)
+# =====================
+# Ignore dữ liệu nặng nhưng phải GIỮ LẠI file .dvc để nhóm pull được data
+data/raw/*
+data/processed/*
+!data/**/*.dvc
 
-# Models
-models/*
-!model.pkl.dvc
+# Các định dạng file data nặng
+*.csv
+*.parquet
+*.pkl
+*.h5
 
-# OS-specific & IDE
-.DS_Store
-Thumbs.db
+# =====================
+# Infrastructure & IDE
+# =====================
+.ipynb_checkpoints/
 .vscode/
 .idea/
+*.db
+!prometheus.yml

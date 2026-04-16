@@ -29,3 +29,15 @@ services:
       - "3000:3000"
     depends_on:
       - prometheus
+    volumes:
+      - ./monitoring/Grafana/dashboards:/etc/grafana/dashboards
+      - ./monitoring/Grafana/provisioning:/etc/grafana/provisioning
+      
+  traffic:
+    build: .
+    container_name: traffic
+    command: python scripts/traffic.py
+    depends_on:
+      - fastapi
+    environment:
+      - API_URL=http://fastapi:8000/predict
