@@ -22,27 +22,47 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Setup uv cache
-        uses: actions/cache@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
-          path: ~/.cache/uv
-          key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-uv-
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
 
       - name: Install dependencies and DVC
         run: |
-          pip install uv
           uv pip install . dvc[s3] --system
+      - name: DVC debug info
+        run: |
+          echo ">>> Python / uv / dvc versions"
+          python --version || true
+          uv --version || true
+          python -c "import dvc; print('dvc', dvc.__version__)" || dvc --version || true
 
+          echo ">>> Check env (masked)"
+          echo "DAGSHUB_S3_ENDPOINT_URL=${DAGSHUB_S3_ENDPOINT_URL:+set}"
+          echo "AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:+set}"
+          echo "AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:+set}"
+
+          echo ">>> Show dvc remotes and config"
+          cat .dvc/config 2>/dev/null || true
+          ls -la
+          dvc remote list || true
+          dvc remote list -v || true
+          dvc status -c || true
       - name: Pull Data from DVC
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.DVC_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.DVC_SECRET_ACCESS_KEY }}
+          DAGSHUB_S3_ENDPOINT_URL: ${{ secrets.DAGSHUB_S3_ENDPOINT_URL }}
         run: |
-          dvc pull data/raw/train.csv.dvc
+          # Configure runner-local DVC remote credentials and endpoint
+          dvc remote modify origin --local access_key_id $AWS_ACCESS_KEY_ID
+          dvc remote modify origin --local secret_access_key $AWS_SECRET_ACCESS_KEY
+          dvc remote modify origin --local endpointurl $DAGSHUB_S3_ENDPOINT_URL
+
+          dvc pull data/raw/train.csv.dvc || echo "Warning: DVC pull failed"
           if [ -f "data/raw/new_dataset.csv.dvc" ]; then
-            dvc pull data/raw/new_dataset.csv.dvc
+            dvc pull data/raw/new_dataset.csv.dvc || echo "Warning: DVC pull failed for new dataset"
           fi
 
       - name: Install GitHub CLI (for issue creation)
@@ -86,26 +106,35 @@ jobs:
       - name: Create Issue Alert
         if: failure() || steps.check_drift.outputs.critical_drift == 'true'
         env:
-          GITHUB_TOKEN: ${{ secrets.TOKENFORMLOPS }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # GH CLI will use the provided GITHUB_TOKEN env var; no interactive login required
+
           STATUS="${{ job.status }}"
-          DRIFT_STATUS="Detected" if [ "${{ steps.check_drift.outputs.critical_drift }}" = "true" ]; else "None"; fi
-          
+          DRIFT_STATUS=$([ "${{ steps.check_drift.outputs.critical_drift }}" = "true" ] && echo "Detected" || echo "None")
+
+          # Diagnostic: show GH auth status to help debug failures (non-fatal)
+          gh auth status || true
+
+          # Build issue body into a temp file to avoid heredoc/indentation problems
+          ISSUE_FILE=$(mktemp /tmp/issue_body.XXXXXX)
+          printf '%s
+          ' "### Status" \
+            "• Workflow: ${{ github.workflow }}" \
+            "• Result: ${STATUS}" \
+            "• Critical Drift: ${DRIFT_STATUS}" \
+            "" \
+            "### Details" \
+            "• Run Link: [View logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" \
+            "• Artifacts: [Download logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" \
+            "" \
+            "### Action Required" \
+            "1. Check uploaded artifacts for monitoring.log" \
+            "2. Review drift details in log file" \
+            "3. Verify if auto-retrain was triggered" \
+            "4. Investigate data quality if needed" > "$ISSUE_FILE"
+
           gh issue create \
-            --title " Drift Alert: ${{ github.repository }} #${{ github.run_id }}" \
-            --body "### Status
-          • Workflow: \`${{ github.workflow }}\`
-          • Result: \`${STATUS}\`
-          • Critical Drift: \`${DRIFT_STATUS}\`
-          
-          ### Details
-          • Run Link: [View logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-          • Artifacts: [Download logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
-          
-          ### Action Required
-          1. Check uploaded artifacts for \`monitoring.log\`
-          2. Review drift details in log file
-          3. Verify if auto-retrain was triggered
-          4. Investigate data quality if needed" \
-            --label "mlops,drift,alert" \
-            2>/dev/null || echo "Could not create GitHub issue"
+            --title "Drift Alert: ${{ github.repository }} #${{ github.run_id }}" \
+            --body-file "$ISSUE_FILE" || { echo "gh issue create failed (exit $?)"; rm -f "$ISSUE_FILE"; exit 1; }
+          rm -f "$ISSUE_FILE"

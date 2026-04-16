@@ -1,9 +1,8 @@
-# .github/workflows/retrain.yml
 name: Retrain Model
 
 on:
-  workflow_dispatch:  # Triggered manually or by detect_drift.py
-  # schedule:         # Optional: auto-retrain weekly
+  workflow_dispatch:
+  # schedule:
   #   - cron: "0 2 * * 0"
 
 jobs:
@@ -11,221 +10,126 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
-      contents: write      # To push updated models
-      actions: read        # To read workflow info
+      contents: write      # Required for create-pull-request action
+      pull-requests: write # Required to create PR
+      actions: read
+      issues: write        # Required to use 'gh issue create'
     
     env:
-      # Centralize config path for consistency
       DRIFT_CONFIG: "config/drift_config.yaml"
       MODEL_DIR: "models"
       DATA_PATH: "data/raw/train.csv"
     
     steps:
       # 1. Checkout code
-      - uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Full history for proper versioning
+          fetch-depth: 0
 
-      # 2. Setup Python + caching
+      # 2. Setup Python & uv
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
 
       - name: Setup uv cache
-        uses: actions/cache@v4
+        uses: astral-sh/setup-uv@v5
         with:
-          path: ~/.cache/uv
-          key: ${{ runner.os }}-uv-${{ hashFiles('uv.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-uv-
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
 
       # 3. Install dependencies
       - name: Install dependencies
-        run: |
-          pip install uv
-          uv pip install . dvc[s3] --system
+        run: uv pip install . dvc[s3] --system
 
-      # 4. Pull data from DVC 
+      # 4. Pull Data from DVC
       - name: Pull training data from DVC
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.DVC_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.DVC_SECRET_ACCESS_KEY }}
+          DAGSHUB_S3_ENDPOINT_URL: ${{ secrets.DAGSHUB_S3_ENDPOINT_URL }}
         run: |
-          # Pull training data (required)
-          dvc pull ${{ env.DATA_PATH }}.vc || echo "Warning: DVC pull failed, checking if file exists locally"
+          dvc remote modify origin --local access_key_id $AWS_ACCESS_KEY_ID
+          dvc remote modify origin --local secret_access_key $AWS_SECRET_ACCESS_KEY
+          dvc remote modify origin --local endpointurl $DAGSHUB_S3_ENDPOINT_URL
+
+          dvc pull ${{ env.DATA_PATH }}.dvc || echo "Warning: DVC pull failed"
           
-          # Verify data exists
           if [ ! -f "${{ env.DATA_PATH }}" ]; then
-            echo "Error: Training data not found at ${{ env.DATA_PATH }}"
+            echo "::error::Training data not found at ${{ env.DATA_PATH }}"
             exit 1
           fi
-          echo "✅ Data ready: $(wc -l < ${{ env.DATA_PATH }}) rows"
 
-      # 5. Pull current model (for warm start / comparison)
-      - name: Pull existing models from Git
-        run: |
-          # Git already has models/ from checkout
-          # Just verify structure
-          if [ -d "${{ env.MODEL_DIR }}" ]; then
-            echo "Models directory exists"
-            ls -la ${{ env.MODEL_DIR }}/
-          else
-            echo "No existing models, will train from scratch"
-            mkdir -p ${{ env.MODEL_DIR }}
-          fi
+      # 5. Setup Models Dir
+      - name: Verify Models Directory
+        run: mkdir -p ${{ env.MODEL_DIR }}
 
-      # 6. Train model (SINGLE CALL - this is the fix)
+      # 6. Train model
       - name: Train and Save Model
         env:
-          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}  # Optional
+          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
         run: |
           echo "Starting training pipeline..."
           python src/models/train_model.py \
             --data ${{ env.DATA_PATH }} \
             --model_dir ${{ env.MODEL_DIR }} \
             --config ${{ env.DRIFT_CONFIG }} \
-            --n_iter 15  # Adjust based on time budget (10-30 typical)
-          
-          # Verify outputs
-          echo "Verifying artifacts..."
-          test -f "${{ env.MODEL_DIR }}/model.pkl" && echo "model.pkl exists" || exit 1
-          test -f "${{ env.MODEL_DIR }}/metadata.json" && echo "metadata.json exists" || exit 1
-          test -f "${{ env.MODEL_DIR }}/baseline_stats.json" && echo "baseline_stats.json exists" || exit 1
-          test -d "${{ env.MODEL_DIR }}/latest" && echo "latest/ directory exists" || exit 1
-          
-          # Show latest metrics
-          echo "Latest model metrics:"
-          cat ${{ env.MODEL_DIR }}/metadata.json | python -m json.tool | grep -A 10 '"metrics"'
+            --n_iter 15
 
-      # 7. (Optional) Backup old model BEFORE commit
-      - name: Backup previous model version
-        if: always()  # Run even if training fails, for audit trail
-        run: |
-          BACKUP_DIR="models/backup/$(date +%Y%m%d_%H%M%S)"
-          mkdir -p "$BACKUP_DIR"
-          
-          # Copy current artifacts if they exist
-          for f in model.pkl metadata.json baseline_stats.json; do
-            if [ -f "models/$f" ]; then
-              cp "models/$f" "$BACKUP_DIR/"
-            fi
-          done
-          
-          # Keep only last 3 backups in Git (avoid repo bloat)
-          if [ -d "models/backup" ]; then
-            cd models/backup
-            ls -dt */ | tail -n +4 | xargs -r rm -rf
-            cd ../..
-          fi
-          
-          echo "Backup saved to $BACKUP_DIR"
+          # Verify flat files strictly (Our Python script guarantees they exist here)
+          test -f "${{ env.MODEL_DIR }}/model.pkl" || (echo "::error::model.pkl missing" && exit 1)
+          test -f "${{ env.MODEL_DIR }}/metadata.json" || (echo "::error::metadata.json missing" && exit 1)
+          test -f "${{ env.MODEL_DIR }}/baseline_stats.json" || (echo "::error::baseline_stats.json missing" && exit 1)
 
-      # 8. Commit and push updated models
-      - name: Commit and Push Models
-        if: success()  # Only commit if training succeeded
-        run: |
-          git config --global user.name "mlops-bot"
-          git config --global user.email "mlops-bot@github.com"
-          
-          # Stage model artifacts (not the version folders, just the pointers)
-          git add \
-            ${{ env.MODEL_DIR }}/model.pkl \
-            ${{ env.MODEL_DIR }}/metadata.json \
-            ${{ env.MODEL_DIR }}/baseline_stats.json \
-            ${{ env.MODEL_DIR }}/latest \
-            ${{ env.MODEL_DIR }}/LATEST_VERSION.txt
-          
-          # Add backup if any changes
-          git add ${{ env.MODEL_DIR }}/backup/ 2>/dev/null || true
-          
-          # Generate commit message with run info
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          COMMIT_MSG="auto-retrain: models updated [run=${{ github.run_id }} sha=${SHORT_SHA}] [skip ci]"
-          
-          # Commit (allow empty in case no changes, though unlikely)
-          git commit -m "$COMMIT_MSG" || echo " No changes to commit"
-          
-          # Push with retry logic
-          for i in 1 2 3; do
-            git push origin HEAD:main && break
-            echo "Push attempt $i failed, retrying in 5s..."
-            sleep 5
-          done
-          
-          echo "Models committed and pushed"
-
-      # 9. Post-training evaluation (optional but recommended)
-      - name: Evaluate New Model
-        if: success()
-        run: |
-          # Only run if evaluate.py exists
-          if [ -f "src/models/evaluate.py" ]; then
-            echo " Running post-training evaluation..."
-            python src/models/evaluate.py \
-              --model_dir ${{ env.MODEL_DIR }} \
-              --test data/raw/new_dataset.csv 2>/dev/null \
-              || echo " Evaluation skipped (test data may not exist)"
-          else
-            echo " evaluate.py not found, skipping evaluation step"
-          fi
-
-      # 10. Notify results
-      - name: Notify Training Result
-        if: always()  # Notify on success OR failure
+      # 7. Push Heavy Model to DVC Remote
+      - name: Push Model to DagsHub via DVC
         env:
-          GH_TOKEN: ${{ secrets.TOKENFORMLOPS }}
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.DVC_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.DVC_SECRET_ACCESS_KEY }}
+          DAGSHUB_S3_ENDPOINT_URL: ${{ secrets.DAGSHUB_S3_ENDPOINT_URL }}
         run: |
-          STATUS="${{ job.status }}"
-          REPO="${{ github.repository }}"
+          # Re-apply remote config safely before push
+          dvc remote modify origin --local access_key_id $AWS_ACCESS_KEY_ID
+          dvc remote modify origin --local secret_access_key $AWS_SECRET_ACCESS_KEY
+          dvc remote modify origin --local endpointurl $DAGSHUB_S3_ENDPOINT_URL
+
+          # Track the heavy binary
+          dvc add ${{ env.MODEL_DIR }}/model.pkl
+          
+          # Upload to remote storage
+          dvc push || (echo "::error::DVC push failed." && exit 1)
+
+      # 8. Create PR for GitHub
+      - name: Create Pull Request for New Model
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN}}
+          commit-message: "auto-retrain: update model [run=${{ github.run_id }}]"
+          branch: "model-update-${{ github.run_id }}"
+          title: "MLOps Auto-Retrain: New Model Available"
+          body: |
+            ### Automated Model Retraining
+            A new model has been trained. The binary is safely tracked in DagsHub via DVC.
+            
+            **Action Required:**
+            Review `models/metadata.json` and merge this PR to promote the model to production.
+          labels: "mlops, auto-retrain"
+          add-paths: |
+            models/model.pkl.dvc
+            models/metadata.json
+            models/baseline_stats.json
+            models/LATEST_VERSION.txt
+
+      # 9. Notify results on Failure
+      - name: Notify Failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN}}
+        run: |
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          
-          # Prepare message
-          if [ "$STATUS" = "success" ]; then
-            EMOJI="✅"
-            TITLE="Retrain Succeeded"
-            # Extract metrics from metadata for Slack
-            METRICS=$(cat models/metadata.json 2>/dev/null | python -c "import sys,json; d=json.load(sys.stdin); print('F1: '+str(d.get('metrics',{}).get('f1','N/A')))" 2>/dev/null || echo "")
-          else
-            EMOJI="❌"
-            TITLE="Retrain Failed"
-            METRICS=""
-          fi
-          
-          MESSAGE="${EMOJI} *${TITLE}*
-          • Repo: \`${REPO}\`
-          • Run: <${RUN_URL}|View Details>
-          • Trigger: ${{ github.event_name }}
-          ${METRICS:+• Metrics: ${METRICS}}"
-          
-          # Send to Slack if configured
-          if [ -n "$SLACK_WEBHOOK" ]; then
-            curl -s -X POST "$SLACK_WEBHOOK" \
-              -H 'Content-type: application/json' \
-              -d "{\"text\":\"${MESSAGE}\"}" \
-              || echo " Slack notification failed"
-          fi
-          
-          # Create GitHub issue on failure (for visibility)
-          if [ "$STATUS" = "failure" ] && [ -n "$GH_TOKEN" ]; then
-            gh issue create \
-              --title "Model Retraining Failed: Run #${{ github.run_id }}" \
-              --body "${MESSAGE}
-
-          ### Debug Info
-          - Workflow: \`${{ github.workflow }}\`
-          - Branch: \`${{ github.ref_name }}\`
-          - Commit: \`${{ github.sha }}\`
-
-          ### Action Required
-          1. Check the [workflow logs](${RUN_URL})
-          2. Verify training data integrity
-          3. Review model artifacts in \`models/\`" \
-              --label "mlops,training-failed" \
-              --assignee "@me" \
-              2>/dev/null || echo " Could not create GitHub issue"
-          fi
-          
-          echo " Notification sent: ${TITLE}"
+          gh issue create \
+            --title "Model Retraining Failed: Run #${{ github.run_id }}" \
+            --body "Workflow failed. Check logs: ${RUN_URL}" \
+            --label "mlops,training-failed" \
+            2>/dev/null || echo "Could not create issue"
