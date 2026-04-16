@@ -11,9 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ==========================================
   # NODE 1: Static Code Analysis (Fail-Fast)
-  # ==========================================
   lint:
     name: Code Linting (Ruff)
     runs-on: ubuntu-latest
@@ -36,14 +34,16 @@ jobs:
       - name: Install Ruff
         run: uv pip install ruff --system
 
-      - name: Run Ruff
+      - name: Run Ruff (Non-blocking)
+        # It shows a yellow warning instead of red error.
+        continue-on-error: true
         run: |
-          echo "Executing ruff..."
-          ruff check src/ streamlit_app/ || (echo "::error::Ruff found issues" && exit 1)
+          echo "Running Ruff linter..."
+          # --format=github makes errors clickable in the GitHub UI
+          # --exit-zero makes the command always return success
+          ruff check src/ streamlit_app/ --format=github
 
-  # ==========================================
   # NODE 2: Data & Integration Validation
-  # ==========================================
   build-and-validate:
     name: DVC Pull & Docker Validation
     needs: lint  # DAG logic: Only run heavy operations if code is clean

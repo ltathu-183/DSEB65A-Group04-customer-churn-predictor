@@ -1,35 +1,30 @@
 {
-  "version": "run_20260416_011104",
-  "timestamp": "2026-04-16T01:14:15.303564",
+  "version": "run_20260416_160817",
+  "timestamp": "2026-04-16T16:18:33.302347",
   "metrics": {
-    "accuracy": 0.9841550693570157,
-    "precision": 0.999342470257053,
-    "recall": 0.9727,
-    "f1": 0.9858412640497836,
-    "f1_macro": 0.9839271083919461,
-    "roc_auc": 0.9864157285089215
+    "accuracy": 0.9844272800480905,
+    "precision": 0.9998766422007032,
+    "recall": 0.97266,
+    "f1": 0.986080556372226,
+    "f1_macro": 0.9842044457644643,
+    "roc_auc": 0.9880822721198941
   },
   "feature_names": [
-    "CustomerID",
     "Age",
     "Gender",
-    "Tenure",
-    "Usage Frequency",
     "Support Calls",
     "Payment Delay",
-    "Subscription Type",
-    "Contract Length",
     "Total Spend",
     "Last Interaction"
   ],
   "best_params": {
     "model__n_estimators": 100,
-    "model__min_samples_split": 2,
+    "model__min_samples_split": 5,
     "model__min_samples_leaf": 1,
-    "model__max_features": "log2",
-    "model__max_depth": null
+    "model__max_features": null,
+    "model__max_depth": 15
   },
-  "mlflow_run_id": "1b9196be64574c06a71fc480d7f0bcdc",
+  "mlflow_run_id": "c4b8ebd4ee3d4e89927544ad032cdd4c",
   "samples": {
     "train": 352665,
     "test": 88167

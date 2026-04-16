@@ -1,50 +1,61 @@
-# =====================
 # Python & Environment
-# =====================
 __pycache__/
 *.py[cod]
+*$py.class
 .env
 .venv/
 venv/
 *.egg-info/
+.pytest_cache/
+.ruff_cache/
 
-# =====================
-# Logs & Monitoring Config (SỬA LỖI Ở ĐÂY)
-# =====================
+# Logs & Monitoring Config
 logs/
 *.log
-# Chỉ ignore các file json rác, GIỮ LẠI file cấu hình quan trọng
+
+# Ignore all JSON files by default to prevent leaking huge API responses
 *.json
+# Whitelist critical JSON config/dashboard files
 !monitoring/**/*.json
 !config/**/*.json
 !models/*.json
 
-# =====================
 # ML artifacts & Models
-# =====================
-models/run_*
+# Ignore local MLflow tracking database and artifacts
 mlruns/
 mlflow.db
-# Giữ lại các file code train model
-!models/*.py
 
-# =====================
-# Data & DVC (QUAN TRỌNG NHẤT)
-# =====================
-# Ignore dữ liệu nặng nhưng phải GIỮ LẠI file .dvc để nhóm pull được data
-data/raw/*
-data/processed/*
-!data/**/*.dvc
+# Ignore all versioned run directories created by train_model.py
+models/run_*/
 
-# Các định dạng file data nặng
-*.csv
-*.parquet
+# Globally ignore all heavy ML binary extensions (tracked by DVC instead)
 *.pkl
 *.h5
+*.pt
+*.pth
 
-# =====================
+# WHITELIST: Explicitly allow DVC pointers and metadata in the models folder
+!models/*.dvc
+!models/LATEST_VERSION.txt
+!models/latest
+
+# Data & DVC
+# Ignore raw and processed data content
+data/raw/*
+data/preprocessed/*
+
+# Globally ignore heavy data extensions
+*.csv
+*.parquet
+
+# WHITELIST: Explicitly keep DVC pointer files so the team can pull data
+!data/**/*.dvc
+
+# DVC Internal caches (Keep .dvc/config but ignore cache)
+.dvc/cache/
+.dvc/tmp/
+
 # Infrastructure & IDE
-# =====================
 .ipynb_checkpoints/
 .vscode/
 .idea/

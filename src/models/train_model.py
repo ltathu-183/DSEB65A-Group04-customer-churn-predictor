@@ -133,45 +133,68 @@ def create_version_dir(base_dir: Path, format_str: str) -> Path:
 
 
 def update_latest_pointer(base_dir: Path, version_dir: Path):
- 
     base_dir = Path(base_dir)
     version_dir = Path(version_dir)
-    
+
     critical_files = ["model.pkl", "metadata.json", "baseline_stats.json"]
-    
+
+    # Copy lightweight artifacts for quick access
     for fname in critical_files:
         src = version_dir / fname
         dst = base_dir / fname
         if src.exists():
-            shutil.copy2(src, dst)
-            logger.debug(f"Copied {fname} to {dst}")
-    
+            try:
+                shutil.copy2(src, dst)
+                logger.debug(f"Copied {fname} to {dst}")
+            except Exception as e:
+                logger.warning(f"Failed copying {fname} to {dst}: {e}")
+
+    # Write LATEST_VERSION.txt using the version directory name (best-effort)
     try:
-        rel_path = version_dir.relative_to(base_dir.parent)
-        (base_dir / "LATEST_VERSION.txt").write_text(str(rel_path))
+        (base_dir / "LATEST_VERSION.txt").write_text(str(version_dir.name))
     except Exception as e:
         logger.warning(f"Could not update LATEST_VERSION.txt: {e}")
 
-    latest_link = base_dir / "latest"
+    latest_path = base_dir / "latest"
+    # Remove any existing target safely
     try:
-        if latest_link.exists() or latest_link.is_symlink():
-            latest_link.unlink()
-        latest_link.symlink_to(version_dir, target_is_directory=True)
-    except OSError:
-        fallback = base_dir / "latest"
-        fallback.mkdir(exist_ok=True)
-        for fname in critical_files:
-            src = version_dir / fname
-            if src.exists():
-                shutil.copy2(src, fallback / fname)
-        logger.info("Used folder fallback for 'latest' (symlink not supported)")
+        if latest_path.is_symlink():
+            latest_path.unlink()
+        elif latest_path.exists():
+            if latest_path.is_dir():
+                shutil.rmtree(latest_path)
+            else:
+                latest_path.unlink()
+    except Exception as e:
+        logger.warning(f"Could not remove existing 'latest': {e}")
+
+    # Create a relative symlink pointing to the version directory name
+    try:
+        # Use just the folder name so symlink inside `models/` resolves to `models/run_xxx`
+        target = version_dir.name
+        latest_path.symlink_to(target, target_is_directory=True)
+        logger.info(f"Created relative 'latest' symlink -> {target}")
+    except Exception as e:
+        logger.warning(f"Could not create relative symlink for 'latest': {e}. Falling back to folder copy.")
+        try:
+            latest_path.mkdir(parents=True, exist_ok=True)
+            for fname in critical_files:
+                src = version_dir / fname
+                if src.exists():
+                    try:
+                        shutil.copy2(src, latest_path / fname)
+                    except Exception as e2:
+                        logger.warning(f"Failed copying {fname} into fallback latest: {e2}")
+            logger.info("Used folder fallback for 'latest' (symlink not supported)")
+        except Exception as e3:
+            logger.error(f"Failed to set up 'latest' pointer: {e3}")
 
 
 def cleanup_old_versions(base_dir: Path, keep_n: int):
     """Giữ lại N version mới nhất, xóa các version cũ"""
     versions = sorted(
         [d for d in Path(base_dir).iterdir() 
-         if d.is_dir() and d.name.startswith("run_")],
+        if d.is_dir() and d.name.startswith("run_")],
         key=lambda x: x.name, reverse=True
     )
     for old in versions[keep_n:]:

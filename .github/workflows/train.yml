@@ -1,6 +1,5 @@
 name: Model Training Pipeline (CT)
 
-# Trigger the workflow on manual dispatch or code changes in models/data
 on:
   workflow_dispatch:
   push:
@@ -13,61 +12,80 @@ jobs:
   train-and-log:
     name: Continuous Training with MLflow & DVC
     runs-on: ubuntu-latest
+    
+    # 1. Copying the exact env block from your working retrain.yml
+    env:
+      DRIFT_CONFIG: "config/drift_config.yaml"
+      MODEL_DIR: "models"
+      DATA_PATH: "data/raw/train.csv"
 
     steps:
-      # 1. Checkout the source code from GitHub
+      # 2. Match your retrain checkout
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      # 2. Set up Python environment
-      - name: Set up Python 3.11
+      # 3. Match your retrain Python/uv setup
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
-      # 3. Install uv package manager and DVC for data retrieval
-      - name: Install uv and Dependencies
+      - name: Setup uv cache
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      # 4. Match your retrain dependency installation
+      - name: Install dependencies
         run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          uv sync --system --no-dev
+          pip install uv
+          uv pip install . dvc[s3] --system
 
-      # 4. Authenticate DVC and pull data from DagsHub
-      - name: Pull Data from DVC Remote
+      # 5. Match your retrain DVC Pull logic (Fixed the endpoint/auth)
+      - name: Pull training data from DVC
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.DVC_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.DVC_SECRET_ACCESS_KEY }}
+          DAGSHUB_S3_ENDPOINT_URL: ${{ secrets.DAGSHUB_S3_ENDPOINT_URL }}
         run: |
-          # Configure local authentication for DVC using the GitHub Secret
-          dvc remote modify origin --local endpointurl ${{ secrets.DAGSHUB_S3_ENDPOINT_URL }}
+          # Configure DVC remote credentials (same as retrain)
+          dvc remote modify origin --local access_key_id $AWS_ACCESS_KEY_ID
+          dvc remote modify origin --local secret_access_key $AWS_SECRET_ACCESS_KEY
+          dvc remote modify origin --local endpointurl $DAGSHUB_S3_ENDPOINT_URL
+
+          # Pull data using the pointer file
+          dvc pull ${{ env.DATA_PATH }}.dvc || (echo "DVC pull failed" && exit 1)
           
-          # Pull training data tracked by DVC
-          dvc pull data/raw/train.csv.dvc
+          # Verify file exists
+          if [ ! -f "${{ env.DATA_PATH }}" ]; then
+            echo "Error: Data not found at ${{ env.DATA_PATH }}"
+            exit 1
+          fi
 
-      # 5. Install Python dependencies defined in pyproject.toml
-      - name: Install Dependencies
-        run: uv sync --system --no-dev
-
-      # 6. Run the training script and log results to DagsHub MLflow
+      # 6. Execute Training Script (Linked to your env variables)
       - name: Execute Training Script
         env:
-          # Remote MLflow tracking configuration for DagsHub
           MLFLOW_TRACKING_URI: https://dagshub.com/${{ github.repository }}.mlflow
           MLFLOW_TRACKING_USERNAME: ${{ github.actor }}
           MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_TOKEN }}
         run: |
-          # Use n_iter=2 to prevent the GitHub Runner from timing out during hyperparameter search
+          echo "Starting training pipeline..."
+          # Use n_iter=2 for fast validation on CI
           python src/models/train_model.py \
-            --data data/raw/train.csv \
-            --model_dir models \
+            --data ${{ env.DATA_PATH }} \
+            --model_dir ${{ env.MODEL_DIR }} \
+            --config ${{ env.DRIFT_CONFIG }} \
             --n_iter 2
 
-      # 7. Upload the trained model and baseline stats as CI artifacts
+      # 7. Upload artifacts (standard CI procedure)
       - name: Upload Training Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: model-run-artifacts
           path: |
-            models/model.pkl
-            models/baseline_stats.json
-            models/LATEST_VERSION.txt
+            ${{ env.MODEL_DIR }}/model.pkl
+            ${{ env.MODEL_DIR }}/metadata.json
+            ${{ env.MODEL_DIR }}/baseline_stats.json
