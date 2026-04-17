@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: churn-ui
+  name: prometheus
   namespace: churn-app
 spec:
   replicas: 1
@@ -13,37 +13,37 @@ spec:
   minReadySeconds: 5
   selector:
     matchLabels:
-      app: churn-ui
+      app: prometheus
   template:
     metadata:
       labels:
-        app: churn-ui
+        app: prometheus
     spec:
       containers:
-        - name: churn-ui
-          image: tobichngoc/churn-ui:v1.1
+        - name: prometheus
+          image: prom/prometheus:latest
           imagePullPolicy: IfNotPresent
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.path=/prometheus
           ports:
-            - containerPort: 8501
-          env:
-            - name: API_URL
-              value: http://churn-api:8000
+            - containerPort: 9090
           readinessProbe:
             httpGet:
-              path: /_stcore/health
-              port: 8501
+              path: /-/ready
+              port: 9090
             initialDelaySeconds: 10
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /_stcore/health
-              port: 8501
-            initialDelaySeconds: 20
-            periodSeconds: 20
+              path: /-/healthy
+              port: 9090
+            initialDelaySeconds: 15
+            periodSeconds: 15
           startupProbe:
             httpGet:
-              path: /_stcore/health
-              port: 8501
+              path: /-/ready
+              port: 9090
             failureThreshold: 18
             periodSeconds: 5
           resources:
@@ -53,3 +53,11 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
+          volumeMounts:
+            - name: prometheus-config
+              mountPath: /etc/prometheus/prometheus.yml
+              subPath: prometheus.yml
+      volumes:
+        - name: prometheus-config
+          configMap:
+            name: prometheus-config

@@ -1,0 +1,9 @@
+apiVersion: 1
+
+providers:
+  - name: 'Monitoring dashboards'
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/dashboards
