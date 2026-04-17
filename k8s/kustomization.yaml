@@ -7,4 +7,19 @@ resources:
   - fastapi-service.yaml
   - streamlit-deployment.yaml
   - streamlit-service.yaml
+  - prometheus-deployment.yaml
+  - prometheus-service.yaml
+  - grafana-deployment.yaml
+  - grafana-service.yaml
   - ingress.yaml
+generatorOptions:
+  disableNameSuffixHash: true
+configMapGenerator:
+  - name: prometheus-config
+    files:
+      - prometheus.yml=monitoring/prometheus.yml
+  - name: grafana-config
+    files:
+      - datasource.yml=monitoring/grafana/provisioning/datasources/datasource.yml
+      - dashboard.yml=monitoring/grafana/provisioning/dashboards/dashboard.yml
+      - churn_dashboard.json=monitoring/grafana/dashboards/churn_dashboard.json
