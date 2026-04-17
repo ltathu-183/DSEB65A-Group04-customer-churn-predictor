@@ -81,8 +81,27 @@ jobs:
           test -f "${{ env.MODEL_DIR }}/model.pkl" || (echo "::error::model.pkl missing" && exit 1)
           test -f "${{ env.MODEL_DIR }}/metadata.json" || (echo "::error::metadata.json missing" && exit 1)
           test -f "${{ env.MODEL_DIR }}/baseline_stats.json" || (echo "::error::baseline_stats.json missing" && exit 1)
+          
+      # 7. Model Quality Gate (Fail-Fast)
+      - name: Model Quality Gate
+        run: |
+          echo "Verifying model quality thresholds..."
+          python -m pytest tests/test_model_quality.py -v
 
-      # 7. Push Heavy Model to DVC Remote
+      
+      # 8. Upload Training Artifacts
+      - name: Upload Training Artifacts
+        if: success() # Only upload if training AND quality gate passed
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-run-artifacts-${{ github.run_id }}
+          path: |
+            ${{ env.MODEL_DIR }}/model.pkl
+            ${{ env.MODEL_DIR }}/metadata.json
+            ${{ env.MODEL_DIR }}/baseline_stats.json
+            ${{ env.MODEL_DIR }}/LATEST_VERSION.txt
+
+      # 9. Push Heavy Model to DVC Remote
       - name: Push Model to DagsHub via DVC
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.DVC_ACCESS_KEY_ID }}
@@ -100,7 +119,7 @@ jobs:
           # Upload to remote storage
           dvc push || (echo "::error::DVC push failed." && exit 1)
 
-      # 8. Create PR for GitHub
+      # 10. Create PR for GitHub
       - name: Create Pull Request for New Model
         uses: peter-evans/create-pull-request@v6
         with:
@@ -121,7 +140,7 @@ jobs:
             models/baseline_stats.json
             models/LATEST_VERSION.txt
 
-      # 9. Notify results on Failure
+      # 11. Notify results on Failure
       - name: Notify Failure
         if: failure()
         env:

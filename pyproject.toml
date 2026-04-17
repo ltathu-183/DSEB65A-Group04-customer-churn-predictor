@@ -26,4 +26,9 @@ dependencies = [
     "prometheus-fastapi-instrumentator>=7.0.0",
     "requests>=2.33.1",
     "dvc[s3]>=3.67.1",
+    "httpcore==1.0.9",
+    "httpx==0.28.1",
 ]
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
