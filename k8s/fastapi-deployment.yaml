@@ -4,7 +4,6 @@ metadata:
   name: churn-api
   namespace: churn-app
 spec:
-  replicas: 2
   strategy:
     type: RollingUpdate
     rollingUpdate:
