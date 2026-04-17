@@ -2,7 +2,7 @@ name: Drift Monitoring
 
 on:
   schedule:
-    - cron: "0 * * * *"  # Every hour
+    - cron: "0 2,14 * * *"  # Runs twice a day (2 AM and 2 PM) to avoid spam
   workflow_dispatch:
 
 jobs:
@@ -49,21 +49,18 @@ jobs:
           dvc remote list || true
           dvc remote list -v || true
           dvc status -c || true
-      - name: Pull Data from DVC
+      - name: Pull Data and Model from DVC
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.DVC_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.DVC_SECRET_ACCESS_KEY }}
           DAGSHUB_S3_ENDPOINT_URL: ${{ secrets.DAGSHUB_S3_ENDPOINT_URL }}
         run: |
-          # Configure runner-local DVC remote credentials and endpoint
           dvc remote modify origin --local access_key_id $AWS_ACCESS_KEY_ID
           dvc remote modify origin --local secret_access_key $AWS_SECRET_ACCESS_KEY
           dvc remote modify origin --local endpointurl $DAGSHUB_S3_ENDPOINT_URL
-
-          dvc pull data/raw/train.csv.dvc || echo "Warning: DVC pull failed"
-          if [ -f "data/raw/new_dataset.csv.dvc" ]; then
-            dvc pull data/raw/new_dataset.csv.dvc || echo "Warning: DVC pull failed for new dataset"
-          fi
+          
+          # FIX: Pull both data AND model pointer
+          dvc pull data/raw/train.csv.dvc data/raw/new_dataset.csv.dvc models/model.pkl.dvc
 
       - name: Install GitHub CLI (for issue creation)
         run: |
@@ -72,6 +69,12 @@ jobs:
           sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
           echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
           sudo apt update && sudo apt install gh -y
+      
+      # Validate Drift Detection Logic with Unit Tests
+      - name: Validate Drift Detection Logic
+        run: |
+          uv pip install pytest scipy --system
+          python -m pytest tests/test_drift_logic.py -v
 
       - name: Run Drift Detection
         id: drift_check
@@ -82,7 +85,8 @@ jobs:
             --model_dir models \
             --config config/drift_config.yaml
         env:
-          TOKENFORMLOPS: ${{ secrets.TOKENFORMLOPS }}
+          # FIX: Pass the built-in GITHUB_TOKEN instead of a potentially limited PAT
+          TOKENFORMLOPS: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check for critical drift in logs
         if: always()
