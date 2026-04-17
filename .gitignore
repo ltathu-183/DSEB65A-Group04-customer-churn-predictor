@@ -19,6 +19,7 @@ logs/
 !monitoring/**/*.json
 !config/**/*.json
 !models/*.json
+!k8s/**/*.json
 
 # ML artifacts & Models
 # Ignore local MLflow tracking database and artifacts
