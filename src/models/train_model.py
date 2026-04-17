@@ -275,6 +275,11 @@ def main(args):
     }
 
     # 8. MLflow + Training
+
+    # FIX: avoid MLflow remote auth issue in CI
+    if os.getenv("CI") == "true":
+        mlflow.set_tracking_uri("file:./mlruns")
+
     try:
         mlflow.set_experiment("churn_model_enterprise")
     except Exception as e:
