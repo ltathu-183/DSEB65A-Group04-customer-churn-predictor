@@ -2,7 +2,7 @@ name: Drift Monitoring
 
 on:
   schedule:
-    - cron: "0 * * * *"  # Every hour
+    - cron: "0 2,14 * * *"  # Runs twice a day (2 AM and 2 PM) to avoid spam
   workflow_dispatch:
 
 jobs:
