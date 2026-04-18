@@ -41,7 +41,7 @@ data:
         "annotations": {
           "grafana.app/createdBy": "user:bfj2fqrkatm9se",
           "grafana.app/folder": "",
-          "grafana.app/saved-from-ui": "Grafana v13.0.0 (e9de482b)"
+          "grafana.app/saved-from-ui": "Grafana 12.4 (e9de482b)"
         }
       },
       "spec": {

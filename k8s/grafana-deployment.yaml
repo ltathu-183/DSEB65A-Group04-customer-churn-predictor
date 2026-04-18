@@ -21,15 +21,21 @@ spec:
     spec:
       containers:
         - name: grafana
-          image: grafana/grafana:12.4
+          image: grafana/grafana:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
           env:
             - name: GF_SECURITY_ADMIN_USER
-              value: admin
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-auth
+                  key: admin-user
             - name: GF_SECURITY_ADMIN_PASSWORD
-              value: admin
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-auth
+                  key: admin-password
           readinessProbe:
             httpGet:
               path: /api/health
