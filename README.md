@@ -111,183 +111,99 @@ Given the **class imbalance nature** of churn datasets, the project focuses on:
 └── uv.lock
 ```
 
-## 4. System Architecture
-
-Upcoming ...
+## 4. High-level System Architecture
 
 ```mermaid
 flowchart TD
 
-
-
 %% =======================
-
 %% FRONTEND & BACKEND
-
 %% =======================
-
 subgraph Frontend
-
     UI[Streamlit UI]
-
 end
-
-
 
 subgraph Backend
-
     API[FastAPI Server]
-
-    API --> PRED["/predict endpoint"]
-
-    JSON_LOG[(monitoring.json)]
-
-    
-
-    %% FastAPI đọc log từ drift để expose metrics
-
-    JSON_LOG -.-> API
-
+    PRED["/predict endpoint"]
+    API --> PRED
 end
-
-
 
 UI --> API
 
-
-
 %% =======================
-
-%% DATA & TRAINING
-
+%% DATA PIPELINE
 %% =======================
-
 subgraph Data_Pipeline
-
     RAW[("data/raw (CSV)")]
-
+    PRE[Preprocess]
+    PROC[("data/preprocessed")]
     TRAIN_SCRIPT[train_model.py]
 
-    RAW --> TRAIN_SCRIPT
-
+    RAW --> PRE --> PROC --> TRAIN_SCRIPT
 end
 
-
-
+%% =======================
+%% DVC STORAGE
+%% =======================
 subgraph DVC_Storage
-
-    DVC_REMOTE["DVC Remote (S3/DagsHub)"]
-
+    DVC_REMOTE["DVC Remote (DagsHub S3)"]
     DVC_PTR["DVC Pointers (.dvc)"]
-
 end
-
-
 
 TRAIN_SCRIPT --> DVC_PTR
-
 DVC_PTR <--> DVC_REMOTE
 
-
-
 %% =======================
-
-%% AUTOMATION
-
+%% GITHUB ACTIONS
 %% =======================
-
 subgraph GitHub_Actions
-
-    CI["ci.yml"]
-
+    CI_G["ci.yml (Push/PR)"]
+    TRAIN_G["train.yml"]
     RETRAIN_G["retrain.yml"]
-
     MONITOR_G["monitor.yml (Cron)"]
-
 end
 
-
-
-%% CI pull model để kiểm tra hoặc deploy
-
-DVC_REMOTE -.-> CI
-
+CI_G --> DVC_REMOTE
+TRAIN_G --> TRAIN_SCRIPT
 RETRAIN_G --> TRAIN_SCRIPT
 
-
-
 %% =======================
-
 %% MONITORING
-
 %% =======================
-
 subgraph Monitoring
-
     DRIFT[detect_drift.py]
-
     PROM[Prometheus]
-
     GRAF[Grafana]
 
-
-
-    %% Luồng: Drift tạo log -> API đọc -> Prometheus hốt
-
-    DRIFT --> JSON_LOG
-
-    API -- "/metrics" --> PROM
-
+    %% Luồng: Drift đẩy log/metric -> Prometheus thu thập -> Grafana hiển thị
+    DRIFT --> PROM
     PROM --> GRAF
-
 end
-
-
 
 MONITOR_G --> DRIFT
 
-
-
 %% =======================
-
 %% OUTPUTS & FEEDBACK
-
 %% =======================
-
 subgraph Outputs
-
-    ISSUE["GitHub Issue"]
-
+    ISSUE["GitHub Issue (Alert)"]
     PR["Model Update PR"]
-
 end
-
-
 
 DRIFT --> ISSUE
-
 ISSUE --> RETRAIN_G
-
-TRAIN_SCRIPT --> PR
-
-
+RETRAIN_G --> PR
 
 %% =======================
-
 %% SERVING
-
 %% =======================
-
 subgraph Serving
-
-    MODEL["model.pkl (In-Memory/Local)"]
-
+    MODEL["model.pkl (Local)"]
 end
 
-
-
-DVC_REMOTE -- "dvc pull" --> MODEL
-
+DVC_REMOTE --> MODEL
+TRAIN_SCRIPT --> MODEL
 MODEL --> API
 ```
 
