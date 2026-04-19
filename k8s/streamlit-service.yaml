@@ -10,4 +10,6 @@ spec:
     - name: http
       port: 8501
       targetPort: 8501
-  type: ClusterIP
+      nodePort: 30501
+  type: NodePort
+  externalTrafficPolicy: Local

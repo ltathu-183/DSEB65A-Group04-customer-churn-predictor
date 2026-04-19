@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: traffic-generator
+  namespace: churn-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: traffic-generator
+  template:
+    metadata:
+      labels:
+        app: traffic-generator
+    spec:
+      containers:
+        - name: traffic-generator
+          image: curlimages/curl:8.8.0
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              while true; do
+                curl -sS http://churn-api:8000/health > /dev/null || true
+                curl -sS -X POST http://churn-api:8000/predict \
+                  -H "Content-Type: application/json" \
+                  -d '{"age":35,"gender":"Female","tenure":12,"usage_frequency":3,"support_calls":1,"payment_delay":1,"subscription_type":"Premium","contract_length":"Annual","total_spend":800.0,"last_interaction":5}' > /dev/null || true
+                sleep 2
+              done
