@@ -347,9 +347,9 @@ dvc remote modify origin secret_access_key <Your_key> --local
 **Verification**: Ensure `.dvc/config.local` exists and contains all 4 parameters. Once verified, download the data:
 
 ```powershell
-dvc pull
+dvc pull --force
 ```
-**Expected Output**
+**Expected Output (For first time pull)**
 ```shell
 Collecting                                           |4.00 [00:00,  177entry/s]
 Fetching
@@ -378,9 +378,10 @@ Access the dashboard at: http://localhost:5000 (*The dashboard will remain empty
 Open a new terminal (ensure the virtual environment is activated and you are in the project root) and run:
 
 ```powershell
-python -m src.models.train_model `
-  --data "data/raw/train.csv" `
-  --model_dir "models" `
+python src/models/train_model.py `
+  --data data/raw/train.csv `
+  --model_dir models `
+  --config config/drift_config.yaml `
   --n_iter 1
 ```
 **Expected Output**
@@ -552,13 +553,22 @@ This step containerizes the entire MLOps stack, including the API, UI, and the m
 
 ### 7.1. Build and Pull Images
 
-**Docker Desktop** must be installed and run before docker build
+**Requirement**
+- Docker Desktop must be installed and run before docker build
+- If you have modified the source code (src/), update `pyproject.toml`, or changed a Dockerfile. Run the following code to remove old image:
+
+```powershell
+# Docker is forced to rebuild the environment with your latest changes
+docker-compose down -v --rmi local
+```
+After checking the requirement, run:
 
 ```powershell
 # Shut down any existing containers and rebuild the stack
-docker-compose down
+docker-compose down -v
 docker-compose up -d --build
 ```
+
 **Expected Output**
 ```powershell
 ...
@@ -573,6 +583,10 @@ docker-compose up -d --build
  ✔ Container streamlit-1          Started
  ✔ Container grafana              Started
 ```
+**Verify in Docker Desktop**
+- Navigate to Images tab in Docker Desktop
+- Ensure the 5 core images (fastapi traffic, streamlit, prometheus, grafana), with the latest tag, are running (green circle icon) 
+
 ### 7.2. Access Service
 To ensure the application runs correctly, verify your containers in Docker Desktop:
 1.  On Docker Desktop, navigate to the **Containers** tab in the left-hand sidebar.
@@ -620,7 +634,7 @@ docker compose logs -fl
 ---
 ### **Step 8: Kubernetes Deployment**
 
-Before deploying to Kubernetes, ensure you have stopped the Docker Compose containers from Step 7 to avoid port conflicts. (See the Action Column of the container `dseb65a-group04-customer-churn-predictor`)
+Before deploying to Kubernetes, ensure you have deleted the Docker Compose containers from Step 7 to avoid port and image conflicts. (See the Action Column of the container `dseb65a-group04-customer-churn-predictor`)
 
 ### Option 1 - For first-time user
 ### 8.1. Start Kubernetes 
