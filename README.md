@@ -135,7 +135,7 @@ UI --> API
 %% DATA PIPELINE
 %% =======================
 subgraph Data_Pipeline
-    RAW[("data/raw (CSV)")]
+    RAW[("data/raw.csv (local)")]
     PRE[Preprocess]
     PROC[("data/preprocessed")]
     TRAIN_SCRIPT[train_model.py]
@@ -712,9 +712,9 @@ This project uses GitHub Actions to automate the end-to-end MLOps workflow, incl
 
 ### 9.1. Workflow Overview
 - `.github\workflows\ci.yml`  Validate code, data, and system before merging
-- `.github\workflows\monitor.yml`: Validate code, data, and system before merging
-- `.github\workflows\retrain.yml`:  Validate code, data, and system before merging.
-- `.github\workflows\train.yml` : Validate code, data, and system before merging.
+- `.github\workflows\monitor.yml`: Runs scheduled drift detection and raises alerts if needed.
+- `.github\workflows\retrain.yml`: Retrains model, validates quality, and creates a PR.
+- `.github\workflows\train.yml` : Triggers training on data/code changes and logs results.
 
 ```mermaid
 graph TB
