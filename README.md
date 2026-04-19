@@ -105,7 +105,6 @@ Given the **class imbalance nature** of churn datasets, the project focuses on:
 │
 ├── docker-compose.yml       # Local development setup
 ├── Dockerfile               # Container for API service
-├── Makefile                 # Automation commands
 ├── pyproject.toml           # Dependency & project config
 ├── README.md
 └── uv.lock
