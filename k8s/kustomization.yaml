@@ -3,6 +3,9 @@ kind: Kustomization
 namespace: churn-app
 resources:
   - namespace.yaml
+  - grafana-secret.yaml      
+  - prometheus-pvc.yaml
+  - fastapi-hpa.yaml
   - fastapi-deployment.yaml
   - fastapi-service.yaml
   - streamlit-deployment.yaml
@@ -12,8 +15,8 @@ resources:
   - grafana-deployment.yaml
   - grafana-service.yaml
   - ingress.yaml
-generatorOptions:
-  disableNameSuffixHash: true
+# generatorOptions:
+#   disableNameSuffixHash: true
 configMapGenerator:
   - name: prometheus-config
     files:

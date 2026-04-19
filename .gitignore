@@ -15,6 +15,7 @@ logs/
 
 # Ignore all JSON files by default to prevent leaking huge API responses
 *.json
+
 # Whitelist critical JSON config/dashboard files
 !monitoring/**/*.json
 !config/**/*.json
@@ -62,3 +63,6 @@ data/preprocessed/*
 .idea/
 *.db
 !prometheus.yml
+
+# k8s grafana login credentials
+k8s/grafana-secret.yaml

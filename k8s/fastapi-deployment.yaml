@@ -4,7 +4,6 @@ metadata:
   name: churn-api
   namespace: churn-app
 spec:
-  replicas: 2
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -22,7 +21,7 @@ spec:
       containers:
         - name: churn-api
           image: tobichngoc/churn-api:v1.1
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           ports:
             - containerPort: 8000
           env:
@@ -49,7 +48,7 @@ spec:
           resources:
             requests:
               cpu: 100m
-              memory: 256Mi
+              memory: 512Mi
             limits:
               cpu: 500m
-              memory: 512Mi
+              memory: 1Gi
