@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
         - name: churn-api
-          image: tobichngoc/churn-api:v1.1
+          image: tobichngoc/churn-api:v1.2
           imagePullPolicy: Always
           ports:
             - containerPort: 8000
