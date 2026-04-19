@@ -31,6 +31,204 @@ function Ensure-RepoRoot {
     return $repoRoot
 }
 
+function Test-HttpEndpoint {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Url,
+        [int]$TimeoutSec = 2
+    )
+
+    try {
+        Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec $TimeoutSec | Out-Null
+        return $true
+    } catch {
+        $response = $_.Exception.Response
+        if ($null -ne $response) {
+            $statusCode = [int]$response.StatusCode
+            if ($statusCode -in 200, 204, 302, 401, 403) {
+                return $true
+            }
+        }
+
+        return $false
+    }
+}
+
+function Get-ProcessCommandLine {
+    param(
+        [Parameter(Mandatory = $true)]
+        [int]$ProcessId
+    )
+
+    try {
+        return (Get-CimInstance Win32_Process -Filter "ProcessId = $ProcessId").CommandLine
+    } catch {
+        return $null
+    }
+}
+
+function Test-PortForwardProcess {
+    param(
+        [Parameter(Mandatory = $true)]
+        [int]$ProcessId
+    )
+
+    $visited = [System.Collections.Generic.HashSet[int]]::new()
+    $currentId = $ProcessId
+
+    while ($currentId -gt 0 -and $visited.Add($currentId)) {
+        try {
+            $processInfo = Get-CimInstance Win32_Process -Filter "ProcessId = $currentId"
+        } catch {
+            break
+        }
+
+        if ($null -eq $processInfo) {
+            break
+        }
+
+        if ($processInfo.CommandLine -match 'kubectl.+port-forward|port-forward.+svc/') {
+            return $true
+        }
+
+        $currentId = [int]$processInfo.ParentProcessId
+    }
+
+    return $false
+}
+
+function Stop-StalePortForward {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$DisplayName,
+        [Parameter(Mandatory = $true)]
+        [int]$LocalPort
+    )
+
+    $connections = @(Get-NetTCPConnection -LocalPort $LocalPort -State Listen -ErrorAction SilentlyContinue)
+    if ($connections.Count -eq 0) {
+        return
+    }
+
+    $processIds = $connections | Select-Object -ExpandProperty OwningProcess -Unique
+    $staleIds = @()
+
+    foreach ($processId in $processIds) {
+        if (Test-PortForwardProcess -ProcessId $processId) {
+            $staleIds += $processId
+        }
+    }
+
+    if ($staleIds.Count -eq 0) {
+        $processList = $processIds -join ', '
+        throw "$DisplayName cannot bind to localhost:${LocalPort} because the port is already in use by a non-port-forward process (PID: $processList)."
+    }
+
+    $allIdsToStop = [System.Collections.Generic.HashSet[int]]::new()
+    foreach ($staleId in $staleIds) {
+        $currentId = $staleId
+        while ($currentId -gt 0 -and $allIdsToStop.Add($currentId)) {
+            try {
+                $processInfo = Get-CimInstance Win32_Process -Filter "ProcessId = $currentId"
+            } catch {
+                break
+            }
+
+            if ($null -eq $processInfo) {
+                break
+            }
+
+            if ($processInfo.CommandLine -notmatch 'kubectl.+port-forward|port-forward.+svc/') {
+                break
+            }
+
+            $currentId = [int]$processInfo.ParentProcessId
+        }
+    }
+
+    if ($allIdsToStop.Count -gt 0) {
+        $stoppedIds = ($allIdsToStop.ToArray() | Sort-Object) -join ', '
+        Write-Host "Stopping stale $DisplayName port-forward process(es) on localhost:${LocalPort}: $stoppedIds" -ForegroundColor Yellow
+        Stop-Process -Id $allIdsToStop.ToArray() -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 1
+    }
+}
+
+function Start-PortForward {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$DisplayName,
+        [Parameter(Mandatory = $true)]
+        [string]$ServiceName,
+        [Parameter(Mandatory = $true)]
+        [int]$LocalPort,
+        [Parameter(Mandatory = $true)]
+        [int]$RemotePort,
+        [Parameter(Mandatory = $true)]
+        [string]$HealthUrl,
+        [string]$Namespace = 'churn-app',
+        [int]$TimeoutSec = 15
+    )
+
+    if (Test-HttpEndpoint -Url $HealthUrl -TimeoutSec 2) {
+        Write-Host "$DisplayName already reachable at $HealthUrl" -ForegroundColor DarkGray
+        return $null
+    }
+
+    Stop-StalePortForward -DisplayName $DisplayName -LocalPort $LocalPort
+
+    $logDir = Join-Path (Resolve-Path .) 'logs\port-forward'
+    New-Item -ItemType Directory -Path $logDir -Force | Out-Null
+
+    $safeName = ($DisplayName -replace '[^a-zA-Z0-9_-]', '_').ToLowerInvariant()
+    $stdoutPath = Join-Path $logDir "$safeName-$LocalPort.stdout.log"
+    $stderrPath = Join-Path $logDir "$safeName-$LocalPort.stderr.log"
+
+    Remove-Item $stdoutPath, $stderrPath -ErrorAction SilentlyContinue
+
+    $command = "kubectl port-forward svc/$ServiceName ${LocalPort}:${RemotePort} -n $Namespace"
+    $process = Start-Process -FilePath 'powershell' `
+        -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', $command) `
+        -RedirectStandardOutput $stdoutPath `
+        -RedirectStandardError $stderrPath `
+        -WindowStyle Hidden `
+        -PassThru
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSec)
+    do {
+        Start-Sleep -Milliseconds 500
+
+        if (Test-HttpEndpoint -Url $HealthUrl -TimeoutSec 2) {
+            Write-Host "$DisplayName port-forward is ready at $HealthUrl" -ForegroundColor Green
+            Write-Host "  logs: $stdoutPath" -ForegroundColor DarkGray
+            return $process
+        }
+
+        if ($process.HasExited) {
+            break
+        }
+    } while ((Get-Date) -lt $deadline)
+
+    if (-not $process.HasExited) {
+        Stop-Process -Id $process.Id -ErrorAction SilentlyContinue
+    }
+
+    $stdoutTail = if (Test-Path $stdoutPath) { (Get-Content $stdoutPath -Tail 20) -join [Environment]::NewLine } else { '' }
+    $stderrTail = if (Test-Path $stderrPath) { (Get-Content $stderrPath -Tail 20) -join [Environment]::NewLine } else { '' }
+
+    if ($stdoutTail) {
+        Write-Host "`n$DisplayName port-forward stdout:" -ForegroundColor DarkYellow
+        Write-Host $stdoutTail -ForegroundColor DarkGray
+    }
+
+    if ($stderrTail) {
+        Write-Host "`n$DisplayName port-forward stderr:" -ForegroundColor Red
+        Write-Host $stderrTail -ForegroundColor DarkGray
+    }
+
+    throw "Failed to start $DisplayName port-forward on localhost:$LocalPort. Check $stdoutPath and $stderrPath."
+}
+
 function Run-DataPipeline {
     Show-Heading 'Data Pipeline'
     Write-Host '1) Data ingestion - simulate labels' -ForegroundColor Yellow
@@ -59,10 +257,12 @@ function Run-DataPipeline {
 function Run-Training {
     Show-Heading 'Model Training'
     
-    Start-Process mlflow -ArgumentList "ui"
+    Start-Process -FilePath "mlflow" -ArgumentList "ui" -WindowStyle Hidden
+    Start-Sleep -Seconds 3
+    Start-Process "http://127.0.0.1:5000"
 
     Write-Host 'Training with MLflow and storing artifacts in models/' -ForegroundColor Yellow
-    python .\src\models\train_model.py --data data\raw\train.csv --model_dir models --config config\drift_config.yaml --n_iter 3
+    python .\src\models\train_model.py --data data\raw\train.csv --model_dir models --config config\drift_config.yaml --n_iter 1
 
     Write-Host 'Training finished. Check mlruns/ for the run and models/ for saved artifacts.' -ForegroundColor Green
 }
@@ -121,12 +321,9 @@ function Deploy-K8s {
     kubectl get pods -n churn-app
     
     Write-Host "`n Starting port-forward services..." -ForegroundColor Yellow
-    # Run port-forward in background 
-    Start-Process powershell -ArgumentList "kubectl port-forward svc/churn-ui 8501:8501 -n churn-app" 
-    Start-Process powershell -ArgumentList "kubectl port-forward svc/grafana 3000:3000 -n churn-app" 
-    Start-Process powershell -ArgumentList "kubectl port-forward svc/prometheus 9090:9090 -n churn-app"
-    
-    Start-Sleep -Seconds 5
+    Start-PortForward -DisplayName 'Streamlit' -ServiceName 'churn-ui' -LocalPort 8501 -RemotePort 8501 -HealthUrl 'http://127.0.0.1:8501/_stcore/health'
+    Start-PortForward -DisplayName 'Grafana' -ServiceName 'grafana' -LocalPort 3000 -RemotePort 3000 -HealthUrl 'http://127.0.0.1:3000/api/health'
+    Start-PortForward -DisplayName 'Prometheus' -ServiceName 'prometheus' -LocalPort 9090 -RemotePort 9090 -HealthUrl 'http://127.0.0.1:9090/-/healthy'
 
     Write-Host "`n Opening services in browser..." -ForegroundColor Green 
     
@@ -134,19 +331,33 @@ function Deploy-K8s {
     Start-Process "http://localhost:3000" # Grafana 
     Start-Process "http://localhost:9090" # Prometheus
     
-    Write-Host '`n Deployment complete!' -ForegroundColor Green
+    Write-Host '`nDeployment complete!' -ForegroundColor Green
 }
 
-function Show-Monitoring {
-    Show-Heading 'Monitoring and Drift Detection'
-    Write-Host 'Tail the monitoring log and show drift metrics from Grafana/Prometheus.' -ForegroundColor Yellow
-    Get-Content .\logs\monitoring.log -Wait
-}
+# function Show-Monitoring {
+#     Show-Heading 'Monitoring and Drift Detection'
+#     Write-Host 'Tail the monitoring log and show drift metrics from Grafana/Prometheus.' -ForegroundColor Yellow
+#     Get-Content .\logs\monitoring.log -Wait
+# }
 function Show-Monitoring {
     Show-Heading 'Monitoring and Drift Detection'
 
     Write-Host 'Checking monitoring pods...' -ForegroundColor Yellow
     kubectl get pods -n churn-app | Select-String "grafana|prometheus"
+
+    if (-not (Test-HttpEndpoint -Url 'http://127.0.0.1:3000/api/health' -TimeoutSec 2)) {
+        Write-Host 'Grafana is not reachable on localhost:3000. Starting port-forward...' -ForegroundColor Yellow
+        Start-PortForward -DisplayName 'Grafana' -ServiceName 'grafana' -LocalPort 3000 -RemotePort 3000 -HealthUrl 'http://127.0.0.1:3000/api/health'
+    } else {
+        Write-Host 'Grafana port-forward is already healthy on localhost:3000' -ForegroundColor DarkGray
+    }
+
+    if (-not (Test-HttpEndpoint -Url 'http://127.0.0.1:9090/-/healthy' -TimeoutSec 2)) {
+        Write-Host 'Prometheus is not reachable on localhost:9090. Starting port-forward...' -ForegroundColor Yellow
+        Start-PortForward -DisplayName 'Prometheus' -ServiceName 'prometheus' -LocalPort 9090 -RemotePort 9090 -HealthUrl 'http://127.0.0.1:9090/-/healthy'
+    } else {
+        Write-Host 'Prometheus port-forward is already healthy on localhost:9090' -ForegroundColor DarkGray
+    }
 
     Write-Host "`n Tailing monitoring log..." -ForegroundColor Yellow
 
