@@ -125,7 +125,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN}}
           commit-message: "auto-retrain: update model [run=${{ github.run_id }}]"
-          branch: "model-update-${{ github.run_id }}"
+          branch: "automated-model-update"
           title: "MLOps Auto-Retrain: New Model Available"
           body: |
             ### Automated Model Retraining

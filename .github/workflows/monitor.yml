@@ -86,7 +86,8 @@ jobs:
             --config config/drift_config.yaml
         env:
           # FIX: Pass the built-in GITHUB_TOKEN instead of a potentially limited PAT
-          TOKENFORMLOPS: ${{ secrets.GITHUB_TOKEN }}
+          # TOKENFORMLOPS: ${{ secrets.GITHUB_TOKEN }}
+          pass: "none"
 
       - name: Check for critical drift in logs
         if: always()
