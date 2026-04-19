@@ -15,6 +15,7 @@ resources:
   - grafana-deployment.yaml
   - grafana-service.yaml
   - ingress.yaml
+  - traffic.yaml
 # generatorOptions:
 #   disableNameSuffixHash: true
 configMapGenerator:
