@@ -214,9 +214,22 @@ MODEL --> API
 - Python **3.11+**
 - Recommended: **uv** (this repo includes `pyproject.toml` + `uv.lock`)
 
-### 5.2. Setup virtual environment
+### 5.2. Clone repository
 
-Firstly, you Install uv (if not already installed):
+1. Create a folder that you want to clone repo
+2. Righ-Click that folder, choose `Open in Terminal`
+3. Paste the following line
+
+```powershell
+git clone https://github.com/chanhbui297/DSEB65A-Group04-customer-churn-predictor.git
+
+cd DSEB65A-Group04-customer-churn-predictor
+```
+Now open the project in your preferred IDE or code editor (e.g. VSCode)
+
+### 5.3. Setup virtual environment
+
+In the terminal you run the below code to install uv (if not already installed):
 
 ```powershell
 pip install uv
@@ -234,15 +247,7 @@ uv sync
 
 ## 6. Running Project Guidelines
 
-### **Step 1: Clone repository**
-
-```powershell
-git clone https://github.com/chanhbui297/DSEB65A-Group04-customer-churn-predictor.git
-
-cd DSEB65A-Group04-customer-churn-predictor
-```
----
-### **Step 2: Pull data using DVC**
+### **Step 1: Pull data using DVC**
 
 To access the dataset, you need to configure the DVC remote with your credentials. Execute each command below, replacing **<Your_key>** with your actual **DagsHub Access Token**:
 
@@ -265,6 +270,8 @@ dvc remote modify origin secret_access_key <Your_key> --local
 ```powershell
 dvc pull --force
 ```
+(*Note: In case your `config.local` file does not have the line `url = s3://DSEB65A-Group04-customer-churn-predictor` and you have problems when pull dvc, you can manually paste the line into your file*)
+
 **Expected Output (For first time pull)**
 ```shell
 Collecting                                           |4.00 [00:00,  177entry/s]
@@ -279,7 +286,7 @@ A       models\model.pkl
 4 files fetched and 4 files added
 ```
 --- 
-###  **Step 3: Model Training**
+###  **Step 2: Model Training**
 
 ### Option 1 — Train Model from Scratch
 
@@ -312,10 +319,23 @@ This option skips the training process and downloads the latest verified model a
 *Note: Skip this if you already successfully executed dvc pull in Step 2.*
 
 ```powershell
-dvc pull
+dvc pull --force
+```
+--- 
+### **Step 3: Data Drift Detection**
+
+**Retraining Trigger:** In a local environment, the automated retraining trigger will only work if you provide a `TOKENFORMLOPS` environment variable. In the CI/CD pipeline, this is handled automatically via **GitHub Secrets**.
+
+```powershell
+# (If you have Github token) 
+# $env:TOKENFORMLOPS=<your_github_token>
+python monitoring/detect_drift.py `
+  --ref data/raw/train.csv `
+  --curr data/raw/new_dataset.csv `
+  --model_dir models `
+  --config config/drift_config.yaml
 ```
 ---
-
 ### **Step 4: Run API Locally**
 
 ### 4.1. Start FastAPI Server
@@ -350,27 +370,29 @@ You should see:
 
 ### 4.3. Test Prediction (Sample Request)
 
-Run this PowerShell script to send a mock customer profile to the API:
+Open the new terminal and run this script to send a mock customer profile to the API:
+
 ```powershell
 $body = @{
-  age = 35
-  gender = "Male"
-  tenure = 12
-  usage_frequency = 5
-  support_calls = 1
-  payment_delay = 0
-  subscription_type = "Basic"
-  contract_length = "Monthly"
-  total_spend = 1200
-  last_interaction = 3
+    age = 35
+    gender = "Male"
+    tenure = 12
+    usage_frequency = 5
+    support_calls = 1
+    payment_delay = 0
+    subscription_type = "Basic"
+    contract_length = "Monthly"
+    total_spend = 1200
+    last_interaction = 3
 } | ConvertTo-Json
 
 Invoke-RestMethod `
-  -Method Post `
-  -Uri "[http://127.0.0.1:8000/predict](http://127.0.0.1:8000/predict)" `
-  -ContentType "application/json" `
-  -Body $body
+    -Method Post `
+    -Uri "http://127.0.0.1:8000/predict" `
+    -ContentType "application/json" `
+    -Body $body
 ```
+
 **Expected Output**
 ```powershell
 churn label      churn_probability
@@ -395,7 +417,7 @@ Try enter input, clink Run Prediction, and see the Results
 
 ---
 
-### **Step 6: Monitoring and Data Drift Simulation Locally (Optional)**
+### **Step 6: Retraining Pipeline (Optional)**
 
 This step allows you to simulate real-world traffic and test how the system detects Data Drift (changes in data distribution that can degrade model performance).
 
@@ -448,9 +470,9 @@ INFO - Saved to data\raw\train.csv
 INFO - New Churn rate: xxx
 ```
 
-### 6.4. Run Drift Detection 
+### 6.4. Data Drift Detection
 
-**Retraining Trigger:** In a local environment, the automated retraining trigger will only work if you provide a `TOKENFORMLOPS` environment variable. In the CI/CD pipeline, this is handled automatically via **GitHub Secrets**.
+After having the new dataset, we repeat step 3 to check for drift detection.
 
 ```powershell
 # (If you have Github token) 
@@ -460,6 +482,18 @@ python monitoring/detect_drift.py `
   --curr data/raw/new_dataset.csv `
   --model_dir models `
   --config config/drift_config.yaml
+```
+
+### 6.5 Mannual Retraining Model
+
+If the result show critical drift, you could retrain the model with the updated data
+
+```powershell
+python src/models/train_model.py `
+  --data data/raw/train.csv `
+  --model_dir models `
+  --config config/drift_config.yaml `
+  --n_iter 1
 ```
 
 ---
@@ -528,7 +562,7 @@ To ensure the application runs correctly, verify your containers in Docker Deskt
 
 *Note: You will be prompted to reset your password after the first login.*
 
-3. Navigate to Dashboards tab in the left-hand sidebar, you should see our project dashboards
+3. Navigate to Dashboards tab in the left-hand sidebar, you should see our project dashboard `Churn Prediction Monitoring`
 
 ### 7.4. Check Running Containers
 
@@ -550,7 +584,7 @@ docker compose logs -fl
 ---
 ### **Step 8: Kubernetes Deployment**
 
-Before deploying to Kubernetes, ensure you have deleted the Docker Compose containers from Step 7 to avoid port and image conflicts. (See the Action Column of the container `dseb65a-group04-customer-churn-predictor`)
+Before deploying to Kubernetes, ensure you have deleted the containers `dseb65a-group04-customer-churn-predictor` from Step 7 to avoid port and image conflicts. (Click the delete button of container `dseb65a-group04-customer-churn-predictor` in docker desktop)
 
 ### Option 1 - For first-time user
 ### 8.1. Start Kubernetes 
@@ -603,11 +637,16 @@ namespace/churn-app created
 ```powershell
 kubectl get pods -n churn-app
 ```
-**Expected Output**
+You may have to wait 3-4 minutes and rerun the code to check until you see the **Expected Output**:
+
 ```powershell
-NAME                    READY   STATUS    RESTARTS   AGE
-churn-api-xxxx xxxx     0/1     Running   0          xxx
-…
+NAME                                 READY   STATUS    RESTARTS   AGE
+churn-api-b7d984f64-2wchl            1/1     Running   0          xxx
+churn-api-b7d984f64-m8cwt            1/1     Running   0          xxx
+churn-ui-5b96d7b566-8fktp            1/1     Running   0          xxx
+grafana-95b66d6d-4q8dk               1/1     Running   0          xxx
+prometheus-6f5b5c4845-lbnmj          1/1     Running   0          xxx
+traffic-generator-6d456f5ffd-2bg59   1/1     Running   0          xxx
 ```
 ### 8.4: Setup local domain (First time only)
 To access the services via custom URLs, you must map them in your system's hosts file.
@@ -654,6 +693,8 @@ For Grafana, use the credentials defined in your local `k8s/grafana-secret.yaml`
 - API Docs: http://api.churn.local/docs
 - Grafana: http://grafana.churn.local
 - Prometheus: http://prometheus.churn.local
+
+You can try run prediction in UI, or Check the our dashboard `Churn Prediction Monitoring` in Dashborads tab.
 
 ### Option B - After first setup
 
@@ -796,6 +837,4 @@ We configured `train.yml`, `retrain.yml`, and `monitor.yml` workflows to support
 1. Go to Actions
 2. Select Retrain Model (`retrain.yml`)
 3. Click Run workflow
-
-
 
