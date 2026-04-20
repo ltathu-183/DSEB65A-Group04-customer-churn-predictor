@@ -264,12 +264,20 @@ dvc remote modify origin access_key_id <Your_key> --local
 dvc remote modify origin secret_access_key <Your_key> --local
 ```
 
-**Verification**: Ensure `.dvc/config.local` exists and contains all 4 parameters. Once verified, download the data:
+**Verification**: 
+To prevent connection errors, ensure your `.dvc/config.local` matches the following structure exactly (including line order). If the automated commands fail, open the file manually and paste this content:
 
+```TOML
+['remote "origin"']
+    url = s3://DSEB65A-Group04-customer-churn-predictor
+    endpointurl = https://dagshub.com/api/v1/repo-buckets/s3/chanhbui297
+    access_key_id = <Your_key>
+    secret_access_key = <Your_key>
+```
+**Pull Data**
 ```powershell
 dvc pull --force
 ```
-(*Note: In case your `config.local` file does not have the line `url = s3://DSEB65A-Group04-customer-churn-predictor` and you have problems when pull dvc, you can manually paste the line into your file*)
 
 **Expected Output (For first time pull)**
 ```shell
@@ -534,7 +542,7 @@ docker-compose up -d --build
 ```
 **Verify in Docker Desktop**
 - Navigate to Images tab in Docker Desktop
-- Ensure the 5 core images (fastapi traffic, streamlit, prometheus, grafana), with the latest tag, are running (green circle icon) 
+- Ensure the 5 core images (fastapi, traffic, streamlit, prometheus, grafana), with the latest tag, are running (green circle icon) 
 
 ### 7.2. Access Service
 To ensure the application runs correctly, verify your containers in Docker Desktop:
@@ -577,7 +585,7 @@ In containers tab, click `dseb65a-group04-customer-churn-predictor`, to see a un
 docker ps
 
 # View Live Logs
-docker compose logs -fl
+docker compose logs -f
 ```
 
 ---
