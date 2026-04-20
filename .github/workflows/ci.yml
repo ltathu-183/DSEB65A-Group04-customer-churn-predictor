@@ -36,7 +36,7 @@ jobs:
         continue-on-error: true # Allow pipeline to continue with warnings
         run: |
           echo "Executing ruff..."
-          ruff check src/ streamlit_app/ --format=github
+          ruff check src/ streamlit_app/ --output-format=github
 
   # NODE 2: Logic Validation (Fail-Fast)
   unit-test:
